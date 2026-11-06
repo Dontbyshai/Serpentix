@@ -12,7 +12,7 @@
   if (!canvas || !canvas.getContext) return;
 
   const ctx = canvas.getContext("2d");
-  let w = 0, h = 0, cell = 18, cols = 0, rows = 0;
+  let w = 0, h = 0, cell = 22, cols = 0, rows = 0;
   let snake = [];
   let dir = { x: 1, y: 0 };
   let nextDir = { x: 1, y: 0 };
@@ -133,7 +133,7 @@
   function draw() {
     ctx.clearRect(0, 0, w, h);
     // Légère grille blanche très fine (traits 1px purs blancs, espacés)
-    ctx.globalAlpha = 0.06;
+    ctx.globalAlpha = 0.08;
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 1;
     const stepG = cell * 2;
@@ -149,7 +149,7 @@
     ctx.stroke();
 
     // Pomme
-    ctx.globalAlpha = 0.22;
+    ctx.globalAlpha = 0.45;
     ctx.fillStyle = "#ffffff";
     const ax = apple.x * cell + (w - cols * cell) / 2;
     const ay = apple.y * cell + (h - rows * cell) / 2;
@@ -169,7 +169,7 @@
     for (let i = 0; i < snake.length; i++) {
       const s = snake[i];
       const t = i / Math.max(1, snake.length - 1);
-      ctx.globalAlpha = 0.12 + (1 - t) * 0.18; // tête plus visible
+      ctx.globalAlpha = 0.22 + (1 - t) * 0.28; // tête plus visible
       const pad = i === 0 ? 2 : 3;
       const x = s.x * cell + ox + pad;
       const y = s.y * cell + oy + pad;
