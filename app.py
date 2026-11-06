@@ -9,11 +9,11 @@ Lancement :
 Puis ouvrir http://127.0.0.1:5000
 
 Fonctionnalités :
+  - Landing jeu (noir & blanc) + bouton Jouer
   - Inscription / connexion (session + mots de passe hachés)
-  - CRUD utilisateurs (formulaires + validation client ET serveur)
-  - Lobby créer / rejoindre une partie
-  - Jeu canvas 1v1 (Snake + Slither) via WebSocket
-  - Classement et profil (couleur de skin)
+  - Solo ou 1v1 via code de salle (Socket.IO)
+  - Boutique de skins (rouge / vert / orange / jaune) contre des coins
+  - CRUD utilisateurs (exigence NSI, routes discrètes /utilisateurs)
 """
 
 import os
@@ -43,22 +43,20 @@ from game_engine import PartieEnCours, generer_code
 app = Flask(__name__)
 
 # Clé de session Flask — à changer en production (variable d'environnement)
-# Ne jamais committer un vrai secret de production.
 app.config["SECRET_KEY"] = os.environ.get(
     "SERPENTIX_SECRET_KEY",
     "serpentix-nsi-dev-key-a-changer",
 )
 
-# SocketIO : async_mode threading (simple, pas besoin d'eventlet forcé)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-# Parties en mémoire : code → PartieEnCours
 PARTIES = {}
 PARTIES_LOCK = threading.Lock()
-
-# Boucle de jeu déjà démarrée ?
 _boucle_demarree = False
 TICK_INTERVAL = 0.10  # 10 images / seconde
+
+# Anti-triche soft pour le solo : max coins crédités par partie
+SOLO_COINS_MAX = 80
 
 
 # ---------------------------------------------------------------------------
@@ -101,9 +99,11 @@ def valider_mot_de_passe(mdp, obligatoire=True):
 
 
 def valider_couleur(couleur):
-    """Couleur hexadécimale #RRGGBB."""
+    """Couleur hexadécimale appartenant au catalogue de skins."""
     if not couleur or not re.fullmatch(r"#[0-9A-Fa-f]{6}", couleur):
         return "Couleur invalide (format #RRGGBB attendu)."
+    if couleur.lower() not in {s["hex"].lower() for s in db.SKINS.values()}:
+        return "Cette couleur n'est pas un skin Serpentix."
     return None
 
 
@@ -124,24 +124,6 @@ def login_requis(f):
         if not utilisateur_connecte():
             flash("Connecte-toi pour accéder à cette page.", "warning")
             return redirect(url_for("connexion", next=request.path))
-        return f(*args, **kwargs)
-
-    return decorated
-
-
-def admin_requis(f):
-    """Décorateur : réservé aux administrateurs."""
-    from functools import wraps
-
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        user = utilisateur_connecte()
-        if not user:
-            flash("Connecte-toi pour accéder à cette page.", "warning")
-            return redirect(url_for("connexion"))
-        if not user.get("est_admin"):
-            flash("Accès réservé aux administrateurs.", "danger")
-            return redirect(url_for("accueil"))
         return f(*args, **kwargs)
 
     return decorated
@@ -171,7 +153,6 @@ def boucle_jeu():
                         etat.get("vainqueur_id"),
                         partie.scores_par_id(),
                     )
-            # Diffusion hors du lock
             socketio.emit("etat_jeu", etat, room=code)
             if a_sauver:
                 pid, vainqueur, scores = a_sauver
@@ -197,13 +178,16 @@ def assurer_boucle():
 
 @app.context_processor
 def inject_user():
-    """Rend `current_user` disponible dans tous les templates."""
-    return {"current_user": utilisateur_connecte()}
+    """Rend current_user + catalogue skins disponibles dans les templates."""
+    return {
+        "current_user": utilisateur_connecte(),
+        "SKINS": db.SKINS,
+    }
 
 
 @app.route("/")
 def accueil():
-    """Page d'accueil : présentation du jeu."""
+    """Landing page — présentation jeu, gros bouton Jouer."""
     return render_template("accueil.html")
 
 
@@ -211,21 +195,18 @@ def accueil():
 def inscription():
     """Création d'un compte (CREATE utilisateur)."""
     if utilisateur_connecte():
-        return redirect(url_for("accueil"))
+        return redirect(url_for("jouer"))
 
     erreurs = {}
-    valeurs = {"pseudo": "", "email": "", "couleur_skin": "#22c55e"}
+    valeurs = {"pseudo": "", "email": ""}
 
     if request.method == "POST":
         pseudo = (request.form.get("pseudo") or "").strip()
         email = (request.form.get("email") or "").strip()
         mdp = request.form.get("mot_de_passe") or ""
         mdp2 = request.form.get("mot_de_passe2") or ""
-        couleur = request.form.get("couleur_skin") or "#22c55e"
+        valeurs = {"pseudo": pseudo, "email": email}
 
-        valeurs = {"pseudo": pseudo, "email": email, "couleur_skin": couleur}
-
-        # --- Validation serveur ---
         e = valider_pseudo(pseudo)
         if e:
             erreurs["pseudo"] = e
@@ -237,25 +218,23 @@ def inscription():
             erreurs["mot_de_passe"] = e
         if mdp != mdp2:
             erreurs["mot_de_passe2"] = "Les mots de passe ne correspondent pas."
-        e = valider_couleur(couleur)
-        if e:
-            erreurs["couleur_skin"] = e
 
-        # Unicité
         if not erreurs.get("pseudo") and db.obtenir_par_pseudo(pseudo):
             erreurs["pseudo"] = "Ce pseudo est déjà pris."
         if not erreurs.get("email") and db.obtenir_par_email(email):
             erreurs["email"] = "Cet e-mail est déjà utilisé."
 
         if not erreurs:
-            # Premier utilisateur = admin (pratique pour la démo NSI)
-            deja = db.lister_utilisateurs()
-            est_admin = 1 if len(deja) == 0 else 0
             hash_mdp = generate_password_hash(mdp)
-            uid = db.creer_utilisateur(pseudo, email, hash_mdp, couleur, est_admin)
+            # Skin gratuit par défaut : blanc — pas de compte admin
+            uid = db.creer_utilisateur(
+                pseudo, email, hash_mdp,
+                couleur_skin="#ffffff", est_admin=0,
+                coins=0, skins_debloques="blanc",
+            )
             session["user_id"] = uid
-            flash(f"Bienvenue {pseudo} ! Compte créé.", "success")
-            return redirect(url_for("accueil"))
+            flash(f"Bienvenue {pseudo} ! Prêt à jouer.", "success")
+            return redirect(url_for("jouer"))
 
     return render_template("inscription.html", erreurs=erreurs, valeurs=valeurs)
 
@@ -264,7 +243,7 @@ def inscription():
 def connexion():
     """Connexion (session)."""
     if utilisateur_connecte():
-        return redirect(url_for("accueil"))
+        return redirect(url_for("jouer"))
 
     erreur = None
     pseudo_val = ""
@@ -273,14 +252,13 @@ def connexion():
         pseudo = (request.form.get("pseudo") or "").strip()
         mdp = request.form.get("mot_de_passe") or ""
         pseudo_val = pseudo
-
         user = db.obtenir_par_pseudo(pseudo)
         if not user or not check_password_hash(user["mot_de_passe_hash"], mdp):
             erreur = "Pseudo ou mot de passe incorrect."
         else:
             session["user_id"] = user["id"]
             flash(f"Bon retour, {user['pseudo']} !", "success")
-            nxt = request.args.get("next") or url_for("accueil")
+            nxt = request.args.get("next") or url_for("jouer")
             return redirect(nxt)
 
     return render_template("connexion.html", erreur=erreur, pseudo=pseudo_val)
@@ -290,20 +268,19 @@ def connexion():
 def deconnexion():
     """Ferme la session."""
     session.clear()
-    flash("Tu es déconnecté.", "info")
+    flash("À bientôt.", "info")
     return redirect(url_for("accueil"))
 
 
 @app.route("/profil", methods=["GET", "POST"])
 @login_requis
 def profil():
-    """Profil : changer couleur / e-mail / mot de passe."""
+    """Profil : e-mail / mot de passe + lien boutique."""
     user = utilisateur_connecte()
     erreurs = {}
 
     if request.method == "POST":
         email = (request.form.get("email") or "").strip()
-        couleur = request.form.get("couleur_skin") or user["couleur_skin"]
         mdp = request.form.get("mot_de_passe") or ""
         mdp2 = request.form.get("mot_de_passe2") or ""
 
@@ -314,10 +291,6 @@ def profil():
             autre = db.obtenir_par_email(email)
             if autre and autre["id"] != user["id"]:
                 erreurs["email"] = "Cet e-mail est déjà utilisé."
-
-        e = valider_couleur(couleur)
-        if e:
-            erreurs["couleur_skin"] = e
 
         nouveau_hash = None
         if mdp or mdp2:
@@ -331,23 +304,46 @@ def profil():
 
         if not erreurs:
             db.mettre_a_jour_utilisateur(
-                user["id"],
-                email=email,
-                couleur_skin=couleur,
-                mot_de_passe_hash=nouveau_hash,
+                user["id"], email=email, mot_de_passe_hash=nouveau_hash
             )
             flash("Profil mis à jour.", "success")
             return redirect(url_for("profil"))
-
         user = db.obtenir_utilisateur(user["id"])
 
     histo = db.historique_utilisateur(user["id"])
     return render_template("profil.html", user=user, erreurs=erreurs, historique=histo)
 
 
+@app.route("/boutique", methods=["GET", "POST"])
+@login_requis
+def boutique():
+    """Boutique de skins : débloquer / équiper (rouge, vert, orange, jaune)."""
+    user = utilisateur_connecte()
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        skin_id = (request.form.get("skin_id") or "").strip().lower()
+        if action == "acheter":
+            ok, msg, _ = db.acheter_skin(user["id"], skin_id)
+            flash(msg, "success" if ok else "warning")
+        elif action == "equiper":
+            ok, msg, _ = db.equiper_skin(user["id"], skin_id)
+            flash(msg, "success" if ok else "warning")
+        return redirect(url_for("boutique"))
+
+    user = db.obtenir_utilisateur(user["id"])
+    equipe = db.skin_id_depuis_hex(user["couleur_skin"])
+    return render_template(
+        "boutique.html",
+        user=user,
+        skins=db.SKINS,
+        equipe=equipe,
+    )
+
+
 @app.route("/classement")
 def classement():
-    """Page classement (scores depuis la BDD)."""
+    """Page classement (scores + coins depuis la BDD)."""
     rows = db.classement()
     return render_template("classement.html", classement=rows)
 
@@ -355,26 +351,27 @@ def classement():
 @app.route("/jouer")
 @login_requis
 def jouer():
-    """Lobby : créer ou rejoindre une salle."""
+    """Hub de jeu : Solo ou 1v1 (créer / rejoindre par code)."""
     return render_template("lobby.html")
 
 
 @app.route("/partie/<code>")
 @login_requis
 def partie(code):
-    """Page de jeu canvas pour une salle donnée."""
+    """Page de jeu canvas pour une salle 1v1."""
     return render_template("partie.html", code=code.upper())
 
 
 @app.route("/solo")
 @login_requis
 def solo():
-    """Mode solo (entraînement) — un serpent vs soi-même / pommes."""
-    return render_template("solo.html")
+    """Mode solo — gagne des coins selon le score."""
+    user = utilisateur_connecte()
+    return render_template("solo.html", couleur=user["couleur_skin"])
 
 
 # ---------------------------------------------------------------------------
-# CRUD utilisateurs (admin) — exigence NSI
+# CRUD utilisateurs — exigence NSI (routes discrètes, pas dans le menu jeu)
 # ---------------------------------------------------------------------------
 
 @app.route("/utilisateurs")
@@ -400,23 +397,28 @@ def detail_utilisateur(uid):
 @app.route("/utilisateurs/<int:uid>/modifier", methods=["GET", "POST"])
 @login_requis
 def modifier_utilisateur(uid):
-    """UPDATE — formulaire de mise à jour."""
+    """UPDATE — formulaire de mise à jour (soi-même uniquement en UI jeu)."""
     courant = utilisateur_connecte()
-    # Soi-même ou admin
-    if courant["id"] != uid and not courant.get("est_admin"):
-        flash("Tu ne peux modifier que ton propre profil ici (ou être admin).", "danger")
-        return redirect(url_for("liste_utilisateurs"))
+    # Modification de son propre compte, ou CRUD scolaire si on connaît l'URL
+    if courant["id"] != uid:
+        # Toujours autorisé pour la démo NSI (formulaires sécurisés serveur)
+        # mais on évite les abus : seul le propriétaire peut changer le mdp
+        pass
 
     user = db.obtenir_utilisateur(uid)
     if not user:
         flash("Utilisateur introuvable.", "danger")
         return redirect(url_for("liste_utilisateurs"))
 
+    # Restriction : on ne modifie que soi-même (sauf lecture liste)
+    if courant["id"] != uid:
+        flash("Tu ne peux modifier que ton propre compte.", "danger")
+        return redirect(url_for("liste_utilisateurs"))
+
     erreurs = {}
     if request.method == "POST":
         pseudo = (request.form.get("pseudo") or "").strip()
         email = (request.form.get("email") or "").strip()
-        couleur = request.form.get("couleur_skin") or user["couleur_skin"]
         mdp = request.form.get("mot_de_passe") or ""
 
         e = valider_pseudo(pseudo)
@@ -435,10 +437,6 @@ def modifier_utilisateur(uid):
             if autre and autre["id"] != uid:
                 erreurs["email"] = "E-mail déjà utilisé."
 
-        e = valider_couleur(couleur)
-        if e:
-            erreurs["couleur_skin"] = e
-
         nouveau_hash = None
         if mdp:
             e = valider_mot_de_passe(mdp)
@@ -447,76 +445,53 @@ def modifier_utilisateur(uid):
             else:
                 nouveau_hash = generate_password_hash(mdp)
 
-        est_admin = user["est_admin"]
-        if courant.get("est_admin") and request.form.get("est_admin") is not None:
-            est_admin = 1 if request.form.get("est_admin") == "1" else 0
-
         if not erreurs:
             db.mettre_a_jour_utilisateur(
                 uid,
                 pseudo=pseudo,
                 email=email,
-                couleur_skin=couleur,
                 mot_de_passe_hash=nouveau_hash,
-                est_admin=est_admin,
             )
-            flash("Utilisateur mis à jour.", "success")
+            flash("Compte mis à jour.", "success")
             return redirect(url_for("detail_utilisateur", uid=uid))
 
-        user = {
-            **user,
-            "pseudo": pseudo,
-            "email": email,
-            "couleur_skin": couleur,
-        }
+        user = {**user, "pseudo": pseudo, "email": email}
 
     return render_template(
         "utilisateur_modifier.html",
         user=user,
         erreurs=erreurs,
-        est_admin_courant=bool(courant.get("est_admin")),
+        est_admin_courant=False,
     )
 
 
 @app.route("/utilisateurs/<int:uid>/supprimer", methods=["POST"])
 @login_requis
 def supprimer_utilisateur(uid):
-    """DELETE — bouton de suppression (admin ou soi-même)."""
+    """DELETE — suppression de son propre compte (bouton NSI)."""
     courant = utilisateur_connecte()
-    if courant["id"] != uid and not courant.get("est_admin"):
+    if courant["id"] != uid:
         flash("Suppression non autorisée.", "danger")
         return redirect(url_for("liste_utilisateurs"))
 
-    if courant["id"] == uid:
-        db.supprimer_utilisateur(uid)
-        session.clear()
-        flash("Ton compte a été supprimé.", "info")
-        return redirect(url_for("accueil"))
-
     db.supprimer_utilisateur(uid)
-    flash("Utilisateur supprimé.", "success")
-    return redirect(url_for("liste_utilisateurs"))
+    session.clear()
+    flash("Ton compte a été supprimé.", "info")
+    return redirect(url_for("accueil"))
 
 
 @app.route("/utilisateurs/nouveau", methods=["GET", "POST"])
-@admin_requis
+@login_requis
 def nouvel_utilisateur():
-    """CREATE via page admin (en plus de /inscription)."""
+    """CREATE via formulaire (exigence NSI) — crée un joueur normal."""
     erreurs = {}
-    valeurs = {"pseudo": "", "email": "", "couleur_skin": "#3b82f6", "est_admin": "0"}
+    valeurs = {"pseudo": "", "email": ""}
 
     if request.method == "POST":
         pseudo = (request.form.get("pseudo") or "").strip()
         email = (request.form.get("email") or "").strip()
         mdp = request.form.get("mot_de_passe") or ""
-        couleur = request.form.get("couleur_skin") or "#3b82f6"
-        est_admin = 1 if request.form.get("est_admin") == "1" else 0
-        valeurs = {
-            "pseudo": pseudo,
-            "email": email,
-            "couleur_skin": couleur,
-            "est_admin": str(est_admin),
-        }
+        valeurs = {"pseudo": pseudo, "email": email}
 
         e = valider_pseudo(pseudo)
         if e:
@@ -531,22 +506,20 @@ def nouvel_utilisateur():
         e = valider_mot_de_passe(mdp)
         if e:
             erreurs["mot_de_passe"] = e
-        e = valider_couleur(couleur)
-        if e:
-            erreurs["couleur_skin"] = e
 
         if not erreurs:
             db.creer_utilisateur(
-                pseudo, email, generate_password_hash(mdp), couleur, est_admin
+                pseudo, email, generate_password_hash(mdp),
+                "#ffffff", 0, 0, "blanc",
             )
-            flash(f"Utilisateur {pseudo} créé.", "success")
+            flash(f"Joueur {pseudo} créé.", "success")
             return redirect(url_for("liste_utilisateurs"))
 
     return render_template("utilisateur_nouveau.html", erreurs=erreurs, valeurs=valeurs)
 
 
 # ---------------------------------------------------------------------------
-# API lobby (JSON) — création / rejoindre
+# API lobby + solo coins
 # ---------------------------------------------------------------------------
 
 @app.route("/api/partie/creer", methods=["POST"])
@@ -554,7 +527,6 @@ def nouvel_utilisateur():
 def api_creer_partie():
     """Crée une salle + enregistrement BDD. Retourne le code."""
     user = utilisateur_connecte()
-    # Code unique
     for _ in range(20):
         code = generer_code()
         if not db.obtenir_partie_par_code(code) and code not in PARTIES:
@@ -581,14 +553,11 @@ def api_rejoindre_partie():
     with PARTIES_LOCK:
         partie = PARTIES.get(code)
         if not partie:
-            # Peut-être encore en BDD mais pas en mémoire → recrée
             row = db.obtenir_partie_par_code(code)
             if not row or row["statut"] != "attente":
                 return jsonify({"ok": False, "erreur": "Partie introuvable ou déjà commencée."}), 404
             partie = PartieEnCours(code, partie_db_id=row["id"])
             PARTIES[code] = partie
-        if len(partie.ordre_sids) >= 2 and partie.statut != "attente":
-            return jsonify({"ok": False, "erreur": "Partie pleine."}), 400
         if len(partie.ordre_sids) >= 2:
             return jsonify({"ok": False, "erreur": "Partie pleine (2 joueurs max)."}), 400
 
@@ -600,13 +569,33 @@ def api_rejoindre_partie():
     return jsonify({"ok": True, "code": code})
 
 
+@app.route("/api/solo/fin", methods=["POST"])
+@login_requis
+def api_solo_fin():
+    """
+    Crédite des coins après une partie solo.
+    Corps JSON : { "score": int }
+    1 pomme = 1 coin, plafonné pour limiter la triche client.
+    """
+    user = utilisateur_connecte()
+    data = request.get_json(silent=True) or {}
+    try:
+        score = int(data.get("score", 0))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "erreur": "Score invalide."}), 400
+    if score < 0:
+        score = 0
+    gain = min(score, SOLO_COINS_MAX)
+    nouveau = db.ajouter_coins(user["id"], gain)
+    return jsonify({"ok": True, "gain": gain, "coins": nouveau})
+
+
 # ---------------------------------------------------------------------------
 # SocketIO — temps réel
 # ---------------------------------------------------------------------------
 
 @socketio.on("connect")
 def on_connect():
-    """Connexion WebSocket (pas encore dans une salle)."""
     pass
 
 
@@ -646,7 +635,6 @@ def on_rejoindre_salle(data):
 
 @socketio.on("direction")
 def on_direction(data):
-    """Le joueur change de direction (flèches / WASD)."""
     code = (data.get("code") or "").upper()
     dx = int(data.get("dx", 0))
     dy = int(data.get("dy", 0))
@@ -674,7 +662,6 @@ def on_quitter_salle(data):
 
 @socketio.on("disconnect")
 def on_disconnect():
-    """Nettoyage si le navigateur se ferme."""
     sid = request.sid
     with PARTIES_LOCK:
         a_notifier = []
@@ -695,30 +682,33 @@ def on_disconnect():
 # Démarrage
 # ---------------------------------------------------------------------------
 
-def creer_admin_demo_si_vide():
-    """Si la BDD est vide, crée un compte démo (documenté dans le README)."""
+def creer_joueurs_demo_si_vide():
+    """Si la BDD est vide, crée deux joueurs normaux (pas d'admin)."""
     if not db.lister_utilisateurs():
         db.creer_utilisateur(
-            "admin",
-            "admin@serpentix.local",
-            generate_password_hash("admin123"),
-            "#eab308",
-            est_admin=1,
+            "joueur1",
+            "joueur1@serpentix.local",
+            generate_password_hash("joueur123"),
+            "#ffffff",
+            est_admin=0,
+            coins=100,
+            skins_debloques="blanc",
         )
         db.creer_utilisateur(
             "joueur2",
             "joueur2@serpentix.local",
             generate_password_hash("joueur2123"),
-            "#3b82f6",
+            "#ffffff",
             est_admin=0,
+            coins=100,
+            skins_debloques="blanc",
         )
 
 
 if __name__ == "__main__":
     db.init_db()
-    creer_admin_demo_si_vide()
+    creer_joueurs_demo_si_vide()
     assurer_boucle()
-    # host 0.0.0.0 pour tests ; debug=False avec le thread de jeu
     print("Serpentix prêt → http://127.0.0.1:5000")
-    print("Comptes démo : admin / admin123  et  joueur2 / joueur2123")
+    print("Comptes démo : joueur1 / joueur123  et  joueur2 / joueur2123")
     socketio.run(app, host="0.0.0.0", port=5000, debug=False, allow_unsafe_werkzeug=True)

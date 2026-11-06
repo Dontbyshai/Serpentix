@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Boutique — Serpentix{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Boutique de skins</h1>
+    <p>L’interface reste noir &amp; blanc. Seul ton serpent porte la couleur.</p>
+  </div>
+  <div class="coins-pill">Solde <strong>◈ {{ user.coins }}</strong></div>
+</div>
+
+<div class="shop-grid">
+  {% for sid, skin in skins.items() %}
+    {% set possede = sid in user.skins_liste %}
+    {% set est_equipe = sid == equipe %}
+    <article class="skin-card {% if possede %}owned{% endif %} {% if est_equipe %}equipped{% endif %}">
+      <div class="skin-preview" aria-hidden="true">
+        <span style="background:{{ skin.hex }}"></span>
+        <span style="background:{{ skin.hex }}; opacity:0.85"></span>
+        <span style="background:{{ skin.hex }}; opacity:0.7"></span>
+      </div>
+      <strong>{{ skin.nom }}</strong>
+      {% if est_equipe %}
+        <span class="badge">Équipé</span>
+      {% elif possede %}
+        <span class="badge">Possédé</span>
+      {% elif skin.prix == 0 %}
+        <span class="price">Gratuit</span>
+      {% else %}
+        <span class="price">◈ {{ skin.prix }}</span>
+      {% endif %}
+
+      <form method="post">
+        <input type="hidden" name="skin_id" value="{{ sid }}">
+        {% if est_equipe %}
+          <button class="btn btn-sm" type="button" disabled>Équipé</button>
+        {% elif possede %}
+          <button class="btn btn-primary btn-sm" type="submit" name="action" value="equiper">Équiper</button>
+        {% else %}
+          <button class="btn btn-primary btn-sm" type="submit" name="action" value="acheter"
+                  {% if user.coins < skin.prix %}disabled{% endif %}>
+            Acheter
+          </button>
+        {% endif %}
+      </form>
+    </article>
+  {% endfor %}
+</div>
+{% endblock %}

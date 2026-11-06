@@ -17,6 +17,8 @@ erDiagram
         TEXT email UK
         TEXT mot_de_passe_hash
         TEXT couleur_skin
+        TEXT skins_debloques
+        INTEGER coins
         INTEGER est_admin
         TEXT date_inscription
     }
@@ -50,8 +52,10 @@ erDiagram
 | `pseudo` | TEXT | NOT NULL, UNIQUE | Nom affiché |
 | `email` | TEXT | NOT NULL, UNIQUE | Contact / login secondaire |
 | `mot_de_passe_hash` | TEXT | NOT NULL | Hash Werkzeug |
-| `couleur_skin` | TEXT | NOT NULL, défaut `#22c55e` | Couleur du serpent |
-| `est_admin` | INTEGER | NOT NULL, défaut 0 | 1 = admin |
+| `couleur_skin` | TEXT | NOT NULL, défaut `#ffffff` | Skin équipé (hex) |
+| `skins_debloques` | TEXT | NOT NULL, défaut `blanc` | Ids séparés par virgules |
+| `coins` | INTEGER | NOT NULL, défaut 0 | Monnaie in-game |
+| `est_admin` | INTEGER | NOT NULL, défaut 0 | Conservé pour CRUD NSI (UI cachée) |
 | `date_inscription` | TEXT | NOT NULL | Horodatage local |
 
 ### `parties`
@@ -91,3 +95,16 @@ Contrainte `UNIQUE (utilisateur_id, partie_id)` : un joueur ne figure qu’une f
 | **Delete** | bouton « Supprimer » (POST) | `DELETE FROM utilisateurs WHERE id = ?` |
 
 Toutes les requêtes utilisent des **paramètres liés** (`?`) pour éviter les injections SQL.
+
+
+## Boutique de skins
+
+Catalogue fixe dans `database.SKINS` :
+
+| id | Hex | Prix |
+|----|-----|------|
+| blanc | `#ffffff` | 0 |
+| rouge | `#ef4444` | 40 |
+| vert | `#22c55e` | 40 |
+| orange | `#f97316` | 60 |
+| jaune | `#eab308` | 60 |

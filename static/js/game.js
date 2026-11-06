@@ -1,7 +1,6 @@
 /**
  * game.js — Client du jeu 1v1 (canvas + Socket.IO)
- * Reçoit l'état du serveur et affiche serpents / pommes / bonus.
- * Envoie les changements de direction (flèches / WASD).
+ * Plateau noir & blanc ; seules les couleurs de skins colorent les serpents.
  */
 (function () {
   const canvas = document.getElementById("game");
@@ -14,10 +13,9 @@
   const code = window.SERPENTIX_CODE;
 
   const socket = io({ transports: ["websocket", "polling"] });
-  let etat = null;
 
   socket.on("connect", function () {
-    statusEl.textContent = "Connecté — envoi dans la salle " + code + "…";
+    statusEl.textContent = "Connecté — salle " + code;
     socket.emit("rejoindre_salle", { code: code });
   });
 
@@ -30,9 +28,8 @@
   });
 
   socket.on("etat_jeu", function (data) {
-    etat = data;
     if (data.statut === "attente") {
-      statusEl.textContent = "En attente d'un 2e joueur… (" + data.nb_joueurs + "/2) — code " + data.code;
+      statusEl.textContent = "En attente… (" + data.nb_joueurs + "/2) — partage le code " + data.code;
     } else if (data.statut === "en_cours") {
       statusEl.textContent = "En cours";
     } else if (data.statut === "terminee") {
@@ -52,10 +49,10 @@
       pill.className = "score-pill";
       pill.innerHTML =
         '<span class="swatch" style="background:' + s.couleur + '"></span>' +
-        "<strong>" + s.pseudo + "</strong> — " + s.score +
-        (s.bouclier ? " 🛡️" : "") +
-        (s.turbo ? " ⚡" : "") +
-        (s.vivant ? "" : " ✕");
+        "<strong>" + s.pseudo + "</strong> " + s.score +
+        (s.bouclier ? " ○" : "") +
+        (s.turbo ? " △" : "") +
+        (s.vivant ? "" : " ×");
       scoresEl.appendChild(pill);
     });
   }
@@ -66,53 +63,57 @@
     const cw = W / data.largeur;
     const ch = H / data.hauteur;
 
-    // Fond damier
-    ctx.fillStyle = "#060a12";
+    ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, W, H);
     for (let y = 0; y < data.hauteur; y++) {
       for (let x = 0; x < data.largeur; x++) {
         if ((x + y) % 2 === 0) {
-          ctx.fillStyle = "#0a1220";
+          ctx.fillStyle = "#0a0a0a";
           ctx.fillRect(x * cw, y * ch, cw, ch);
         }
       }
     }
 
-    // Pommes
     (data.pommes || []).forEach(function (p) {
       const x = p[0] * cw + cw / 2;
       const y = p[1] * ch + ch / 2;
       ctx.beginPath();
-      ctx.fillStyle = "#ef4444";
-      ctx.arc(x, y, Math.min(cw, ch) * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.arc(x, y, Math.min(cw, ch) * 0.32, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#22c55e";
-      ctx.fillRect(x - 2, y - ch * 0.4, 4, 6);
     });
 
-    // Bonus
     (data.bonus || []).forEach(function (b) {
       const x = b.pos[0] * cw + cw / 2;
       const y = b.pos[1] * ch + ch / 2;
-      ctx.font = Math.floor(Math.min(cw, ch) * 0.7) + "px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(b.type === "turbo" ? "⚡" : "🛡️", x, y);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      if (b.type === "turbo") {
+        ctx.beginPath();
+        ctx.moveTo(x, y - 7);
+        ctx.lineTo(x + 6, y + 6);
+        ctx.lineTo(x - 6, y + 6);
+        ctx.closePath();
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(x, y, 7, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     });
 
-    // Serpents
     (data.serpents || []).forEach(function (s) {
       const corps = s.corps || [];
       corps.forEach(function (seg, i) {
         const px = seg[0] * cw;
         const py = seg[1] * ch;
         ctx.fillStyle = s.couleur;
-        ctx.globalAlpha = s.vivant ? (i === 0 ? 1 : 0.85) : 0.35;
+        ctx.globalAlpha = s.vivant ? (i === 0 ? 1 : 0.85) : 0.3;
         const pad = i === 0 ? 1 : 2;
         roundRect(ctx, px + pad, py + pad, cw - pad * 2, ch - pad * 2, 4);
         ctx.fill();
         if (i === 0 && s.bouclier) {
-          ctx.strokeStyle = "#38bdf8";
+          ctx.strokeStyle = "#ffffff";
           ctx.lineWidth = 2;
           ctx.strokeRect(px + 1, py + 1, cw - 2, ch - 2);
         }
@@ -131,7 +132,6 @@
     ctx.closePath();
   }
 
-  // Contrôles clavier
   const dirs = {
     ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
     w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],

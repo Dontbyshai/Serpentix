@@ -143,3 +143,11 @@ L’ensemble du code source est dans le dépôt GitHub, notamment :
 - `static/css/style.css` — apparence
 
 Tous les fichiers sont **commentés en français**.
+
+
+## Refonte UX (v2)
+
+- Landing jeu noir & blanc + bouton Jouer
+- Boutique skins (rouge / vert / orange / jaune) contre coins
+- Modes Solo et 1v1 par code partageable
+- Panneau admin retiré du menu ; CRUD NSI reste en pied de page

@@ -5,20 +5,20 @@
   <span class="swatch lg" style="background:{{ user.couleur_skin }}"></span>
   {{ user.pseudo }}
 </h1>
-<ul class="info-list">
-  <li><strong>ID :</strong> {{ user.id }}</li>
-  <li><strong>E-mail :</strong> {{ user.email }}</li>
-  <li><strong>Skin :</strong> <code>{{ user.couleur_skin }}</code></li>
-  <li><strong>Rôle :</strong> {% if user.est_admin %}Administrateur{% else %}Joueur{% endif %}</li>
-  <li><strong>Inscrit le :</strong> {{ user.date_inscription }}</li>
+<ul style="list-style:none;padding:0;color:var(--muted)">
+  <li><strong style="color:var(--text)">ID :</strong> {{ user.id }}</li>
+  <li><strong style="color:var(--text)">E-mail :</strong> {{ user.email }}</li>
+  <li><strong style="color:var(--text)">Skin :</strong> <code>{{ user.couleur_skin }}</code></li>
+  <li><strong style="color:var(--text)">Coins :</strong> ◈ {{ user.coins }}</li>
+  <li><strong style="color:var(--text)">Inscrit le :</strong> {{ user.date_inscription }}</li>
 </ul>
 
-{% if current_user and (current_user.est_admin or current_user.id == user.id) %}
-  <div class="actions">
+{% if current_user and current_user.id == user.id %}
+  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin:1rem 0">
     <a class="btn btn-primary" href="{{ url_for('modifier_utilisateur', uid=user.id) }}">Modifier</a>
     <form method="post" action="{{ url_for('supprimer_utilisateur', uid=user.id) }}"
-          class="inline" onsubmit="return confirm('Confirmer la suppression ?');">
-      <button type="submit" class="btn btn-danger">Supprimer</button>
+          onsubmit="return confirm('Confirmer la suppression ?');">
+      <button type="submit" class="btn btn-ghost">Supprimer</button>
     </form>
   </div>
 {% endif %}
