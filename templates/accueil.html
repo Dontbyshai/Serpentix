@@ -13,22 +13,11 @@
     <div class="landing-cta">
       {% if current_user %}
         <a class="btn btn-primary btn-xl" href="{{ url_for('jouer') }}">Jouer</a>
-        <a class="btn btn-ghost" href="{{ url_for('boutique') }}">Boutique de skins</a>
+        <a class="btn btn-ghost" href="{{ url_for('boutique') }}">Boutique</a>
       {% else %}
         <a class="btn btn-primary btn-xl" href="{{ url_for('connexion') }}">Jouer</a>
         <a class="btn btn-ghost" href="{{ url_for('inscription') }}">Créer un compte</a>
       {% endif %}
-    </div>
-  </div>
-
-  <div class="landing-visual" aria-hidden="true">
-    <div class="snake-banner">
-      <span class="seg head"></span>
-      <span class="seg"></span>
-      <span class="seg"></span>
-      <span class="seg"></span>
-      <span class="seg"></span>
-      <span class="apple"></span>
     </div>
   </div>
 
@@ -41,7 +30,7 @@
     <article class="feature">
       <div class="num">02</div>
       <h3>Coins &amp; skins</h3>
-      <p>Gagne des coins en jouant. Débloque rouge, vert, orange ou jaune — le reste du site reste noir &amp; blanc.</p>
+      <p>Gagne des coins en jouant. Débloque rouge, vert, orange ou jaune — le site reste noir &amp; blanc.</p>
     </article>
     <article class="feature">
       <div class="num">03</div>

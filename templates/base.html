@@ -7,8 +7,11 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body>
-  <!-- Menu de navigation (exigence NSI) — UX jeu, pas panneau admin -->
+<body class="has-bg-snake {% block body_class %}{% endblock %}">
+  <!-- Serpent décoratif en arrière-plan (non interactif) -->
+  <canvas id="bg-snake" aria-hidden="true"></canvas>
+
+  <!-- Menu de navigation (exigence NSI) -->
   <header class="site-header">
     <a class="logo" href="{{ url_for('accueil') }}">
       <span class="logo-mark" aria-hidden="true"></span> Serpentix
@@ -49,11 +52,11 @@
 
   <footer class="site-footer">
     <p>Serpentix — Projet NSI · Snake × Slither</p>
-    <!-- Lien discret pour la démo CRUD scolaire (pas dans le menu jeu) -->
     <p><a href="{{ url_for('liste_utilisateurs') }}">Gestion joueurs (NSI)</a></p>
   </footer>
 
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/bg-snake.js') }}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>
