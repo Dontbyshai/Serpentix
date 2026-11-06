@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Joueurs — Serpentix{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Joueurs</h1>
+  {% if current_user and current_user.est_admin %}
+    <a class="btn btn-primary btn-sm" href="{{ url_for('nouvel_utilisateur') }}">+ Nouvel utilisateur</a>
+  {% endif %}
+</div>
+<p class="muted">Liste des comptes (READ). Clique pour voir le détail, modifier ou supprimer.</p>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>ID</th><th>Pseudo</th><th>E-mail</th><th>Skin</th><th>Rôle</th><th>Inscription</th><th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for u in utilisateurs %}
+    <tr>
+      <td>{{ u.id }}</td>
+      <td>
+        <span class="swatch" style="background:{{ u.couleur_skin }}"></span>
+        <a href="{{ url_for('detail_utilisateur', uid=u.id) }}">{{ u.pseudo }}</a>
+      </td>
+      <td>{{ u.email }}</td>
+      <td><code>{{ u.couleur_skin }}</code></td>
+      <td>{% if u.est_admin %}Admin{% else %}Joueur{% endif %}</td>
+      <td>{{ u.date_inscription }}</td>
+      <td class="actions">
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('detail_utilisateur', uid=u.id) }}">Voir</a>
+        {% if current_user and (current_user.est_admin or current_user.id == u.id) %}
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('modifier_utilisateur', uid=u.id) }}">Modifier</a>
+          <form method="post" action="{{ url_for('supprimer_utilisateur', uid=u.id) }}"
+                class="inline" onsubmit="return confirm('Supprimer {{ u.pseudo }} ?');">
+            <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7">Aucun utilisateur.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

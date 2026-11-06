@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Jouer — Serpentix{% endblock %}
+{% block content %}
+<h1>Lobby 1 contre 1</h1>
+<p class="muted">Crée une salle et partage le code, ou rejoins une partie existante.</p>
+
+<div class="lobby-grid">
+  <section class="card">
+    <h2>Créer une partie</h2>
+    <p>Tu seras le premier serpent. Attends qu’un ami rejoigne.</p>
+    <button id="btn-creer" class="btn btn-primary">Créer une salle</button>
+    <p id="creer-msg" class="hint"></p>
+  </section>
+
+  <section class="card">
+    <h2>Rejoindre</h2>
+    <form id="form-rejoindre" class="form">
+      <div class="field">
+        <label for="code">Code de la salle</label>
+        <input type="text" id="code" name="code" maxlength="6" placeholder="ABC123"
+               style="text-transform:uppercase" required>
+        <span class="err" id="rejoindre-err"></span>
+      </div>
+      <button type="submit" class="btn btn-primary">Rejoindre</button>
+    </form>
+  </section>
+</div>
+
+<p class="muted">Astuce : ouvre deux onglets avec deux comptes pour tester le 1v1 sur la même machine.</p>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/lobby.js') }}"></script>
+{% endblock %}

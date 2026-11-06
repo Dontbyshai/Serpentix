@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Connexion — Serpentix{% endblock %}
+{% block content %}
+<h1>Connexion</h1>
+{% if erreur %}<div class="flash flash-danger">{{ erreur }}</div>{% endif %}
+<form id="form-connexion" class="form" method="post" novalidate>
+  <div class="field">
+    <label for="pseudo">Pseudo</label>
+    <input type="text" id="pseudo" name="pseudo" value="{{ pseudo }}" required autocomplete="username">
+    <span class="err" data-for="pseudo"></span>
+  </div>
+  <div class="field">
+    <label for="mot_de_passe">Mot de passe</label>
+    <input type="password" id="mot_de_passe" name="mot_de_passe" required autocomplete="current-password">
+    <span class="err" data-for="mot_de_passe"></span>
+  </div>
+  <button type="submit" class="btn btn-primary">Se connecter</button>
+</form>
+<p class="muted">Pas encore de compte ? <a href="{{ url_for('inscription') }}">Inscription</a></p>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/validation.js') }}"></script>
+<script>initValidationConnexion();</script>
+{% endblock %}

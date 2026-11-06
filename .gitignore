@@ -1,0 +1,23 @@
+# Environnement virtuel Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Base de données locale (générée au premier lancement)
+*.db
+instance/
+
+# Secrets / config locale
+.env
+.secret_key
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp

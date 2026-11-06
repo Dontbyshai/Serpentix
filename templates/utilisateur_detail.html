@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ user.pseudo }} — Serpentix{% endblock %}
+{% block content %}
+<h1>
+  <span class="swatch lg" style="background:{{ user.couleur_skin }}"></span>
+  {{ user.pseudo }}
+</h1>
+<ul class="info-list">
+  <li><strong>ID :</strong> {{ user.id }}</li>
+  <li><strong>E-mail :</strong> {{ user.email }}</li>
+  <li><strong>Skin :</strong> <code>{{ user.couleur_skin }}</code></li>
+  <li><strong>Rôle :</strong> {% if user.est_admin %}Administrateur{% else %}Joueur{% endif %}</li>
+  <li><strong>Inscrit le :</strong> {{ user.date_inscription }}</li>
+</ul>
+
+{% if current_user and (current_user.est_admin or current_user.id == user.id) %}
+  <div class="actions">
+    <a class="btn btn-primary" href="{{ url_for('modifier_utilisateur', uid=user.id) }}">Modifier</a>
+    <form method="post" action="{{ url_for('supprimer_utilisateur', uid=user.id) }}"
+          class="inline" onsubmit="return confirm('Confirmer la suppression ?');">
+      <button type="submit" class="btn btn-danger">Supprimer</button>
+    </form>
+  </div>
+{% endif %}
+
+<h2>Dernières parties</h2>
+{% if historique %}
+<table class="table">
+  <thead><tr><th>Code</th><th>Date</th><th>Score</th><th>Résultat</th></tr></thead>
+  <tbody>
+  {% for h in historique %}
+    <tr>
+      <td><code>{{ h.code }}</code></td>
+      <td>{{ h.date_creation }}</td>
+      <td>{{ h.score }}</td>
+      <td>{% if h.a_gagne %}Victoire{% elif h.statut == 'terminee' %}Défaite{% else %}{{ h.statut }}{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Aucune partie.</p>
+{% endif %}
+<p><a href="{{ url_for('liste_utilisateurs') }}">← Retour à la liste</a></p>
+{% endblock %}

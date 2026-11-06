@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Classement — Serpentix{% endblock %}
+{% block content %}
+<h1>Classement</h1>
+<p class="muted">Victoires puis score total (pommes mangées).</p>
+{% if classement %}
+<table class="table">
+  <thead>
+    <tr>
+      <th>#</th><th>Joueur</th><th>Victoires</th><th>Parties</th><th>Score total</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for j in classement %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>
+        <span class="swatch" style="background:{{ j.couleur_skin }}"></span>
+        <a href="{{ url_for('detail_utilisateur', uid=j.id) }}">{{ j.pseudo }}</a>
+      </td>
+      <td>{{ j.victoires }}</td>
+      <td>{{ j.parties_jouees }}</td>
+      <td>{{ j.score_total }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Pas encore de joueurs.</p>
+{% endif %}
+{% endblock %}

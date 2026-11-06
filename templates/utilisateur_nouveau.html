@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Nouvel utilisateur — Serpentix{% endblock %}
+{% block content %}
+<h1>Créer un utilisateur (admin)</h1>
+<form class="form" method="post" id="form-nouveau" novalidate>
+  <div class="field">
+    <label for="pseudo">Pseudo</label>
+    <input type="text" id="pseudo" name="pseudo" value="{{ valeurs.pseudo }}"
+           minlength="3" maxlength="20" pattern="[A-Za-z0-9_\-]+" required>
+    <span class="err" data-for="pseudo">{{ erreurs.get('pseudo', '') }}</span>
+  </div>
+  <div class="field">
+    <label for="email">E-mail</label>
+    <input type="email" id="email" name="email" value="{{ valeurs.email }}" required>
+    <span class="err" data-for="email">{{ erreurs.get('email', '') }}</span>
+  </div>
+  <div class="field">
+    <label for="mot_de_passe">Mot de passe</label>
+    <input type="password" id="mot_de_passe" name="mot_de_passe" minlength="6" required>
+    <span class="err" data-for="mot_de_passe">{{ erreurs.get('mot_de_passe', '') }}</span>
+  </div>
+  <div class="field">
+    <label for="couleur_skin">Couleur</label>
+    <input type="color" id="couleur_skin" name="couleur_skin" value="{{ valeurs.couleur_skin }}">
+    <span class="err" data-for="couleur_skin">{{ erreurs.get('couleur_skin', '') }}</span>
+  </div>
+  <div class="field">
+    <label for="est_admin">Rôle</label>
+    <select id="est_admin" name="est_admin">
+      <option value="0" {% if valeurs.est_admin == '0' %}selected{% endif %}>Joueur</option>
+      <option value="1" {% if valeurs.est_admin == '1' %}selected{% endif %}>Administrateur</option>
+    </select>
+  </div>
+  <button type="submit" class="btn btn-primary">Créer</button>
+</form>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/validation.js') }}"></script>
+<script>initValidationNouveau();</script>
+{% endblock %}

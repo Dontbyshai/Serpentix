@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Solo — Serpentix{% endblock %}
+{% block content %}
+<h1>Entraînement solo</h1>
+<p class="muted">Mode local (sans adversaire) pour s’habituer aux contrôles. Score non enregistré.</p>
+<div class="game-wrap">
+  <canvas id="solo-canvas" width="800" height="600"></canvas>
+  <aside class="game-help">
+    <p>Score : <strong id="solo-score">0</strong></p>
+    <button id="solo-restart" class="btn btn-primary btn-sm">Recommencer</button>
+    <ul>
+      <li>Flèches / WASD</li>
+      <li>Murs mortels</li>
+      <li>Pommes + bonus</li>
+    </ul>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/solo.js') }}"></script>
+{% endblock %}

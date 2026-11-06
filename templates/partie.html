@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Partie {{ code }} — Serpentix{% endblock %}
+{% block content %}
+<div class="game-header">
+  <h1>Partie <code id="room-code">{{ code }}</code></h1>
+  <p id="game-status" class="muted">Connexion…</p>
+  <div id="scores" class="scores"></div>
+</div>
+
+<div class="game-wrap">
+  <canvas id="game" width="800" height="600" aria-label="Plateau de jeu Serpentix"></canvas>
+  <aside class="game-help">
+    <h3>Contrôles</h3>
+    <ul>
+      <li>↑ ↓ ← → ou <kbd>WASD</kbd></li>
+      <li>🍎 Pomme = +1 segment</li>
+      <li>⚡ Turbo = vitesse ×2</li>
+      <li>🛡️ Bouclier = 1 choc</li>
+    </ul>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('jouer') }}">Retour lobby</a>
+  </aside>
+</div>
+<div id="fin-overlay" class="overlay hidden">
+  <div class="overlay-box">
+    <h2 id="fin-msg"></h2>
+    <a class="btn btn-primary" href="{{ url_for('jouer') }}">Nouvelle partie</a>
+    <a class="btn btn-ghost" href="{{ url_for('classement') }}">Classement</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+  window.SERPENTIX_CODE = {{ code|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/game.js') }}"></script>
+{% endblock %}
