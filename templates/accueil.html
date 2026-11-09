@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Accueil — Serpentix{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-text">
+    <h1>Serpentix</h1>
+    <p class="lead">
+      Affronte un autre joueur en direct dans un mélange de
+      <strong>Snake</strong> et de <strong>Slither.io</strong> :
+      mange des pommes, grandis, et élimine l’adversaire en touchant son corps.
+    </p>
+    <div class="hero-actions">
+      {% if current_user %}
+        <a class="btn btn-primary" href="{{ url_for('jouer') }}">Lancer une partie</a>
+        <a class="btn btn-ghost" href="{{ url_for('solo') }}">S’entraîner en solo</a>
+      {% else %}
+        <a class="btn btn-primary" href="{{ url_for('inscription') }}">Créer un compte</a>
+        <a class="btn btn-ghost" href="{{ url_for('connexion') }}">Se connecter</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="hero-art" aria-hidden="true">
+    <div class="snake-preview">
+      <span class="seg s1"></span><span class="seg s2"></span><span class="seg s3"></span>
+      <span class="seg s4"></span><span class="apple">🍎</span>
+    </div>
+  </div>
+</section>
+
+<section class="cards">
+  <article class="card">
+    <h2>1 contre 1</h2>
+    <p>Crée une salle, partage le code, et affronte un ami sur le même site en temps réel.</p>
+  </article>
+  <article class="card">
+    <h2>Pommes &amp; bonus</h2>
+    <p>Grandis en mangeant. Attrape le <em>turbo</em> (vitesse) ou le <em>bouclier</em> (1 choc absorbé).</p>
+  </article>
+  <article class="card">
+    <h2>Skins</h2>
+    <p>Choisis la couleur de ton serpent dans ton profil. Elle est sauvegardée en base SQL.</p>
+  </article>
+</section>
+
+<section class="rules">
+  <h2>Règles rapides</h2>
+  <ul>
+    <li>Flèches ou WASD pour diriger (pas de demi-tour).</li>
+    <li>Toucher un <strong>mur</strong> ou le <strong>corps</strong> de l’adversaire = élimination.</li>
+    <li>Le dernier serpent vivant gagne. Les scores sont enregistrés.</li>
+  </ul>
+</section>
+{% endblock %}
