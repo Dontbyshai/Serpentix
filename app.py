@@ -9,11 +9,14 @@ Rôle de ce fichier : c'est le « serveur web » du projet.
   - Il valide les données côté SERVEUR (on ne fait jamais confiance au
     navigateur, la validation JavaScript peut être contournée).
   - Il appelle database.py pour lire / écrire dans SQLite.
-  - Il fait tourner les parties 1v1 en temps réel avec Socket.IO
-    (WebSocket : connexion qui reste ouverte, le serveur peut « pousser »
-    l'état du jeu 10 fois par seconde sans que le client redemande).
+  - Il fait tourner les parties multijoueur (2 ou 3 joueurs) en temps réel
+    avec Socket.IO (WebSocket : connexion qui reste ouverte, le serveur peut
+    « pousser » l'état du jeu plusieurs fois par seconde sans que le client
+    redemande).
 
 Lancement :  python app.py   puis   http://127.0.0.1:5000
+Comptes   :  python app.py --comptes   crée les comptes Shai, zoubida et noah
+             s'ils n'existent pas encore (sans rien effacer).
 """
 
 import hmac
@@ -21,6 +24,7 @@ import os
 import re
 import secrets
 import sqlite3
+import sys
 import threading
 import time
 from functools import wraps
@@ -32,7 +36,10 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.security import generate_password_hash, check_password_hash
 
 import database as db
-from game_engine import PartieEnCours, generer_code, code_valide, TICKS_PAR_SECONDE
+from game_engine import (
+    PartieEnCours, generer_code, code_valide, TICKS_PAR_SECONDE,
+    JOUEURS_POSSIBLES, BONUS, reglages_client,
+)
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -74,12 +81,28 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True  # cookie illisible en JavaScript
 # ouvrir une connexion temps réel.
 socketio = SocketIO(app, async_mode="threading")
 
-# Parties 1v1 en mémoire : {code: PartieEnCours}. Le verrou (Lock) évite que
+# Parties en cours, en mémoire : {code: PartieEnCours}. Le verrou (Lock) évite que
 # le thread de jeu et une requête modifient la même partie au même moment.
 PARTIES = {}
 PARTIES_LOCK = threading.Lock()
 _boucle_demarree = False
-TICK_INTERVAL = 1 / TICKS_PAR_SECONDE   # 0,1 s → 10 images par seconde
+TICK_INTERVAL = 1 / TICKS_PAR_SECONDE   # durée d'un tick (1/7 s ≈ 0,14 s)
+
+# Fiche de chaque bonus, affichée sur les pages de jeu et dans la doc.
+# L'ordre de ce dictionnaire est l'ordre d'affichage de la légende.
+BONUS_INFOS = {
+    "turbo": ("Turbo", "Avance 2 fois plus vite pendant 3 s."),
+    "bouclier": ("Bouclier", "Annule un choc mortel (le serpent recule et tourne)."),
+    "fantome": ("Fantôme", "Traverse les corps pendant 4 s (pas les murs)."),
+    "aimant": ("Aimant", "Attire les pommes proches pendant 6 s."),
+    "ciseaux": ("Ciseaux", "Coupe la moitié de la queue de l'ennemi le plus proche."),
+    "gel": ("Gel", "Ralentit tous les adversaires pendant 3 s."),
+}
+
+# Comptes de joueurs demandés pour la classe (mot de passe 1234).
+# Ils sont créés directement par le serveur avec un hash Werkzeug : la règle
+# « 6 caractères minimum » reste appliquée aux inscriptions par formulaire.
+COMPTES_DE_BASE = (("Shai", "1234"), ("zoubida", "1234"), ("noah", "1234"))
 
 # --- Anti-triche du mode solo (voir api_solo_debut / api_solo_fin) ---------
 SOLO_COINS_MAX = 80             # plafond de coins par partie solo
@@ -211,11 +234,12 @@ def inject_globals():
         "current_user": utilisateur_connecte(),
         "SKINS": db.SKINS,
         "csrf_token": jeton_csrf,
+        "BONUS_INFOS": BONUS_INFOS,
     }
 
 
 # ---------------------------------------------------------------------------
-# Boucle de jeu (thread qui « tique » 10 fois par seconde)
+# Boucle de jeu (thread qui « tique » TICKS_PAR_SECONDE fois par seconde)
 # ---------------------------------------------------------------------------
 
 def cloturer_partie(code, partie):
@@ -255,7 +279,7 @@ def boucle_jeu():
             socketio.emit("etat_jeu", etat, room=code)
             if finie:
                 cloturer_partie(code, partie)
-        # On dort le temps restant pour garder un rythme régulier de 0,1 s
+        # On dort le temps restant pour garder un rythme régulier
         time.sleep(max(0.0, TICK_INTERVAL - (time.time() - debut)))
 
 
@@ -279,7 +303,8 @@ def partie_depuis_code(code):
         return partie
     row = db.obtenir_partie_par_code(code)
     if row and row["statut"] == "attente":
-        partie = PartieEnCours(code, partie_db_id=row["id"])
+        partie = PartieEnCours(code, partie_db_id=row["id"],
+                               max_joueurs=row.get("nb_joueurs") or 2)
         PARTIES[code] = partie
     return partie
 
@@ -458,33 +483,54 @@ def boutique():
 
 @app.route("/classement")
 def classement():
-    """READ collectif : classement calculé en SQL (voir database.classement)."""
-    return render_template("classement.html", classement=db.classement())
+    """
+    READ collectif : classement calculé en SQL (voir database.classement).
+    Paramètre d'URL ?tri=victoires|ratio|score|coins. Une valeur inconnue
+    (ou piégée) est remplacée par « victoires » : validation côté serveur.
+    """
+    tri = request.args.get("tri", "victoires")
+    if tri not in db.TRIS_CLASSEMENT:
+        tri = "victoires"
+    lignes = db.classement(tri=tri, limit=50)
+    moi = utilisateur_connecte()
+    # Position du joueur connecté (pour la mettre en évidence)
+    ma_ligne = None
+    if moi:
+        for rang, ligne in enumerate(lignes, start=1):
+            if ligne["id"] == moi["id"]:
+                ma_ligne = {**ligne, "rang": rang}
+    return render_template("classement.html", classement=lignes, tri=tri,
+                           podium=lignes[:3], ma_ligne=ma_ligne)
 
 
 @app.route("/jouer")
 @login_requis
 def jouer():
-    """Hub de jeu : Solo, ou 1v1 (créer une salle / rejoindre avec un code)."""
+    """Hub de jeu : Solo, ou multijoueur à 2 ou 3 (créer une salle / rejoindre avec un code)."""
     return render_template("lobby.html")
 
 
 @app.route("/partie/<code>")
 @login_requis
 def partie(code):
-    """Page canvas d'une salle 1v1. Le code est vérifié avant affichage."""
+    """Page canvas d'une salle multijoueur. Le code est vérifié avant affichage."""
     code = code.upper()
     if not code_valide(code):
         flash("Code de salle invalide.", "warning")
         return redirect(url_for("jouer"))
-    return render_template("partie.html", code=code)
+    # Durée en secondes de chaque effet minuté (pour les barres du HUD)
+    durees = {nom: info["duree"] / TICKS_PAR_SECONDE
+              for nom, info in BONUS.items() if info["duree"]}
+    return render_template("partie.html", code=code, durees=durees)
 
 
 @app.route("/solo")
 @login_requis
 def solo():
     """Mode solo : la partie tourne dans le navigateur (solo.js)."""
-    return render_template("solo.html", couleur=utilisateur_connecte()["couleur_skin"])
+    # reglages_client() : vitesse, durées des bonus… lues dans game_engine.py
+    return render_template("solo.html", couleur=utilisateur_connecte()["couleur_skin"],
+                           reglages=reglages_client())
 
 
 # ---------------------------------------------------------------------------
@@ -634,10 +680,20 @@ def nouvel_utilisateur():
 @login_requis
 def api_creer_partie():
     """
-    Crée une salle 1v1 : code unique + ligne dans la table parties.
-    Retour JSON : {"ok": true, "code": "ABC123"}.
+    Crée une salle : code unique + ligne dans la table parties.
+    Corps JSON : {"nb_joueurs": 2 ou 3} (taille de la salle).
+    Retour JSON : {"ok": true, "code": "ABC123", "nb_joueurs": 3}.
     """
     user = utilisateur_connecte()
+    data = request.get_json(silent=True) or {}
+    # Validation SERVEUR : seuls 2 et 3 sont acceptés (la page ne propose que
+    # ces deux choix, mais une requête peut être fabriquée à la main)
+    try:
+        nb_joueurs = int(data.get("nb_joueurs", 2))
+    except (TypeError, ValueError):
+        nb_joueurs = 0
+    if nb_joueurs not in JOUEURS_POSSIBLES:
+        return jsonify({"ok": False, "erreur": "Choisis 2 ou 3 joueurs."}), 400
     for _ in range(20):  # on retire un code tant qu'il est déjà utilisé
         code = generer_code()
         if code not in PARTIES and not db.obtenir_partie_par_code(code):
@@ -645,18 +701,18 @@ def api_creer_partie():
     else:
         return jsonify({"ok": False, "erreur": "Impossible de générer un code."}), 500
 
-    partie_id = db.creer_partie(code, user["id"])
+    partie_id = db.creer_partie(code, user["id"], nb_joueurs)
     with PARTIES_LOCK:
-        PARTIES[code] = PartieEnCours(code, partie_db_id=partie_id)
+        PARTIES[code] = PartieEnCours(code, partie_db_id=partie_id, max_joueurs=nb_joueurs)
     assurer_boucle()
-    return jsonify({"ok": True, "code": code})
+    return jsonify({"ok": True, "code": code, "nb_joueurs": nb_joueurs})
 
 
 @app.route("/api/partie/rejoindre", methods=["POST"])
 @login_requis
 def api_rejoindre_partie():
     """
-    Vérifie qu'une salle existe, attend encore un joueur et a de la place.
+    Vérifie qu'une salle existe, attend encore des joueurs et a de la place.
     Corps JSON : {"code": "ABC123"}. Retour : {"ok": bool, "code" | "erreur"}.
     """
     data = request.get_json(silent=True) or {}
@@ -670,8 +726,9 @@ def api_rejoindre_partie():
         if not partie or partie.statut != "attente":
             return jsonify({"ok": False, "erreur": "Partie introuvable ou déjà commencée."}), 404
         deja_dedans = any(s.joueur_id == user["id"] for s in partie.joueurs.values())
-        if len(partie.ordre_sids) >= 2 and not deja_dedans:
-            return jsonify({"ok": False, "erreur": "Partie pleine (2 joueurs max)."}), 400
+        if len(partie.ordre_sids) >= partie.max_joueurs and not deja_dedans:
+            return jsonify({"ok": False,
+                            "erreur": f"Partie pleine ({partie.max_joueurs} joueurs max)."}), 400
         partie_db_id = partie.partie_db_id
 
     if partie_db_id:
@@ -728,7 +785,7 @@ def api_solo_fin():
 
 
 # ---------------------------------------------------------------------------
-# Socket.IO — événements temps réel du 1v1
+# Socket.IO — événements temps réel des parties multijoueur
 # ---------------------------------------------------------------------------
 # Client → serveur : rejoindre_salle, direction, quitter_salle
 # Serveur → client : etat_jeu, partie_lancee, erreur
@@ -746,7 +803,8 @@ def on_rejoindre_salle(data):
     """
     Le navigateur entre dans la salle : on l'ajoute à la partie et à la
     « room » Socket.IO (groupe de connexions qui reçoivent le même état).
-    Quand le 2e joueur arrive, la partie démarre (compte à rebours de 3 s).
+    Quand la salle est pleine (2 ou 3 joueurs selon le choix du créateur),
+    la partie démarre (compte à rebours de 3 s).
     """
     user = utilisateur_connecte()  # la session Flask marche aussi en Socket.IO
     if not user:
@@ -774,9 +832,12 @@ def on_rejoindre_salle(data):
             partie.demarrer()
         etat = partie.etat_public()
         partie_db_id = partie.partie_db_id
+        ids_joueurs = [s.joueur_id for s in partie.joueurs.values()]
 
     if demarrer and partie_db_id:
-        db.ajouter_participant(partie_db_id, user["id"])
+        # Chaque joueur présent a sa ligne dans participations (2 ou 3 lignes)
+        for uid in ids_joueurs:
+            db.ajouter_participant(partie_db_id, uid)
         db.demarrer_partie(partie_db_id)
     emit("etat_jeu", etat, room=code)
     if demarrer:
@@ -801,7 +862,7 @@ def on_direction(data):
 
 def depart_joueur(sid, codes):
     """
-    Retire la connexion sid des parties indiquées et prévient l'adversaire.
+    Retire la connexion sid des parties indiquées et prévient les autres joueurs.
     Paramètres : sid (str), codes (liste de codes de salle).
     """
     a_notifier, a_cloturer = [], []
@@ -852,13 +913,43 @@ def creer_joueurs_demo_si_vide():
                                  est_admin=0, coins=100, skins_debloques="blanc")
 
 
+def creer_comptes_de_base():
+    """
+    Crée les comptes de COMPTES_DE_BASE (Shai, zoubida, noah) s'ils n'existent
+    pas encore. Ne supprime et ne modifie RIEN : un compte déjà présent (même
+    pseudo, sans tenir compte des majuscules) est laissé tel quel.
+    Passe par les fonctions normales du projet : db.creer_utilisateur() et
+    generate_password_hash() (le mot de passe n'est jamais stocké en clair).
+    Retour : liste des pseudos créés.
+    """
+    crees = []
+    for pseudo, mdp in COMPTES_DE_BASE:
+        if db.obtenir_par_pseudo(pseudo):
+            continue
+        try:
+            db.creer_utilisateur(pseudo, f"{pseudo.lower()}@serpentix.local",
+                                 generate_password_hash(mdp), "#ffffff",
+                                 est_admin=0, coins=100, skins_debloques="blanc")
+            crees.append(pseudo)
+        except sqlite3.IntegrityError:
+            pass  # e-mail déjà pris par un autre compte : on n'écrase rien
+    return crees
+
+
 if __name__ == "__main__":
     db.init_db()
-    creer_joueurs_demo_si_vide()
+    if "--comptes" in sys.argv:
+        # Utilisation : python app.py --comptes  (puis le programme s'arrête)
+        print("Comptes créés :", ", ".join(creer_comptes_de_base()) or "aucun (déjà là)")
+        sys.exit(0)
+    if not db.lister_utilisateurs():
+        # Base toute neuve : comptes de démonstration + comptes de la classe
+        creer_joueurs_demo_si_vide()
+        creer_comptes_de_base()
     assurer_boucle()
     host = os.environ.get("SERPENTIX_HOST", "0.0.0.0")
     port = int(os.environ.get("SERPENTIX_PORT", "5000"))
     print(f"Serpentix prêt → http://{host}:{port}")
-    print("Comptes démo : joueur1 / joueur123  et  joueur2 / joueur2123")
+    print("Comptes démo : joueur1 / joueur123, joueur2 / joueur2123, Shai / 1234")
     # allow_unsafe_werkzeug : serveur de développement, suffisant pour un projet scolaire
     socketio.run(app, host=host, port=port, debug=False, allow_unsafe_werkzeug=True)

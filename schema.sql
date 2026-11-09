@@ -1,6 +1,6 @@
 -- ============================================================
 -- Serpentix — Schéma de la base de données SQLite
--- Projet NSI : site web dynamique + jeu 1v1
+-- Projet NSI : site web dynamique + jeu multijoueur (2 ou 3)
 -- ============================================================
 
 -- Table des utilisateurs (joueurs inscrits)
@@ -16,13 +16,15 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
     date_inscription TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
--- Table des parties (une salle de jeu 1v1)
+-- Table des parties (une salle de jeu à 2 ou 3 joueurs)
 CREATE TABLE IF NOT EXISTS parties (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT NOT NULL UNIQUE,                -- code à 6 caractères pour rejoindre
     statut TEXT NOT NULL DEFAULT 'attente',   -- attente | en_cours | terminee
+    nb_joueurs INTEGER NOT NULL DEFAULT 2     -- taille de la salle choisie par le créateur
+        CHECK (nb_joueurs IN (2, 3)),
     createur_id INTEGER NOT NULL,             -- joueur qui a créé la salle
-    vainqueur_id INTEGER,                     -- NULL tant que la partie n'est pas finie
+    vainqueur_id INTEGER,                     -- NULL tant que la partie n'est pas finie (ou match nul)
     date_creation TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     date_fin TEXT,
     -- Si le créateur supprime son compte, ses parties sont supprimées aussi

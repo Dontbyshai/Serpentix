@@ -13,7 +13,7 @@ tapées par l'utilisateur ne sont jamais collées dans la chaîne SQL, donc une
 injection SQL du type  ' OR 1=1 --  est impossible.
 
 Tables (voir schema.sql et docs/schema.md) :
-  utilisateurs, parties, participations.
+  utilisateurs, parties (2 ou 3 joueurs), participations.
 """
 
 import os
@@ -39,7 +39,7 @@ SKINS = {
 # Dictionnaire inverse « hex → id » (pour savoir quel skin est équipé)
 SKIN_PAR_HEX = {v["hex"].lower(): k for k, v in SKINS.items()}
 
-# Bonus de coins accordé au vainqueur d'un 1v1 (en plus de son score)
+# Bonus de coins accordé au vainqueur d'une partie multijoueur (en plus de son score)
 BONUS_VICTOIRE = 15
 
 
@@ -90,8 +90,9 @@ def _colonnes_utilisateurs():
 
 def migrer_si_besoin():
     """
-    Mise à jour d'une ANCIENNE base (créée avant l'ajout des coins/skins) :
-    ajoute les colonnes manquantes sans perdre les données existantes.
+    Mise à jour d'une ANCIENNE base (créée avant l'ajout des coins/skins ou
+    des parties à 3) : ajoute les colonnes manquantes sans perdre les données
+    existantes (ALTER TABLE … ADD COLUMN ne touche pas aux lignes déjà là).
     """
     cols = _colonnes_utilisateurs()
     if not cols:
@@ -105,6 +106,14 @@ def migrer_si_besoin():
             cur.execute(
                 "ALTER TABLE utilisateurs ADD COLUMN skins_debloques "
                 "TEXT NOT NULL DEFAULT 'blanc'"
+            )
+        # Parties à 3 joueurs : la colonne nb_joueurs n'existait pas avant.
+        # Les anciennes parties étaient toutes des duels → valeur par défaut 2.
+        cur.execute("PRAGMA table_info(parties)")
+        cols_parties = {row["name"] for row in cur.fetchall()}
+        if cols_parties and "nb_joueurs" not in cols_parties:
+            cur.execute(
+                "ALTER TABLE parties ADD COLUMN nb_joueurs INTEGER NOT NULL DEFAULT 2"
             )
 
 
@@ -366,16 +375,18 @@ def skin_id_depuis_hex(hex_couleur):
 # PARTIES & SCORES
 # ---------------------------------------------------------------------------
 
-def creer_partie(code, createur_id):
+def creer_partie(code, createur_id, nb_joueurs=2):
     """
     Crée une partie « en attente » ET la participation de son créateur.
+    Paramètres : code (str), createur_id (int), nb_joueurs (2 ou 3).
     Les deux INSERT sont dans la même transaction (tout ou rien).
     Retour : int — id de la partie.
     """
     with db_cursor() as cur:
         cur.execute(
-            "INSERT INTO parties (code, statut, createur_id) VALUES (?, 'attente', ?)",
-            (code, createur_id),
+            "INSERT INTO parties (code, statut, createur_id, nb_joueurs) "
+            "VALUES (?, 'attente', ?, ?)",
+            (code, createur_id, nb_joueurs),
         )
         partie_id = cur.lastrowid
         cur.execute(
@@ -419,6 +430,7 @@ def terminer_partie(partie_id, vainqueur_id, scores):
     Paramètres :
       partie_id (int), vainqueur_id (int ou None si match nul),
       scores (dict {utilisateur_id: score}).
+    Fonctionne pour 2 ou 3 joueurs : on boucle sur TOUS les scores reçus.
     Gain de chaque joueur = son score (+ BONUS_VICTOIRE s'il a gagné).
     La condition « statut != 'terminee' » empêche de payer deux fois la
     même partie si la fonction était appelée deux fois.
@@ -449,27 +461,60 @@ def terminer_partie(partie_id, vainqueur_id, scores):
             ajouter_coins(uid, gain)
 
 
-def classement(limit=20):
-    """
-    Classement global, calculé par SQL (jointure + agrégats).
+# Tris autorisés pour le classement. On ne colle JAMAIS dans la requête SQL
+# un texte venu de l'URL : on choisit une clause ORDER BY dans cette liste
+# blanche (sinon ?tri=... permettrait une injection SQL).
+TRIS_CLASSEMENT = {
+    "victoires": "victoires DESC, ratio DESC, meilleur_score DESC",
+    "ratio": "ratio DESC, victoires DESC, parties_jouees DESC",
+    "score": "meilleur_score DESC, victoires DESC",
+    "coins": "coins DESC, victoires DESC",
+}
 
-    Retour : liste de dict (pseudo, victoires, score_total, parties_jouees, coins).
-    LEFT JOIN : un joueur sans partie apparaît quand même (avec 0).
-    On ne compte que les parties TERMINÉES (pas les salles abandonnées).
+
+def classement(tri="victoires", limit=50):
     """
+    Classement global, calculé ENTIÈREMENT en SQL (jointures + agrégats).
+
+    Paramètres : tri (clé de TRIS_CLASSEMENT), limit (int).
+    Retour     : liste de dict (id, pseudo, couleur_skin, coins,
+                 parties_jouees, victoires, nuls, defaites, ratio,
+                 meilleur_score, score_total).
+    - LEFT JOIN : un joueur sans partie apparaît quand même (avec 0).
+    - On ne compte que les parties TERMINÉES (pas les salles abandonnées) :
+      la condition « pa.statut = 'terminee' » est dans le ON du LEFT JOIN.
+    - Victoire = la partie a ce joueur comme vainqueur_id ;
+      nul = partie terminée sans vainqueur ; défaite = le reste.
+    - La sous-requête calcule les totaux, la requête extérieure calcule
+      les défaites et le pourcentage de victoires à partir de ces totaux.
+    """
+    ordre = TRIS_CLASSEMENT.get(tri, TRIS_CLASSEMENT["victoires"])
     with db_cursor() as cur:
         cur.execute(
-            """
-            SELECT
-                u.id, u.pseudo, u.couleur_skin, u.coins,
-                COUNT(pa.id)                  AS parties_jouees,
-                COALESCE(SUM(p.a_gagne), 0)   AS victoires,
-                COALESCE(SUM(p.score), 0)     AS score_total
-            FROM utilisateurs u
-            LEFT JOIN participations p ON p.utilisateur_id = u.id
-            LEFT JOIN parties pa ON pa.id = p.partie_id AND pa.statut = 'terminee'
-            GROUP BY u.id
-            ORDER BY victoires DESC, score_total DESC, u.coins DESC, u.pseudo ASC
+            f"""
+            SELECT t.*,
+                   t.parties_jouees - t.victoires - t.nuls AS defaites,
+                   CASE WHEN t.parties_jouees = 0 THEN 0
+                        ELSE ROUND(100.0 * t.victoires / t.parties_jouees, 1)
+                   END AS ratio
+            FROM (
+                SELECT
+                    u.id, u.pseudo, u.couleur_skin, u.coins,
+                    COUNT(pa.id) AS parties_jouees,
+                    COALESCE(SUM(CASE WHEN pa.vainqueur_id = u.id THEN 1 ELSE 0 END), 0)
+                        AS victoires,
+                    COALESCE(SUM(CASE WHEN pa.id IS NOT NULL AND pa.vainqueur_id IS NULL
+                                      THEN 1 ELSE 0 END), 0) AS nuls,
+                    COALESCE(MAX(CASE WHEN pa.id IS NOT NULL THEN p.score END), 0)
+                        AS meilleur_score,
+                    COALESCE(SUM(CASE WHEN pa.id IS NOT NULL THEN p.score END), 0)
+                        AS score_total
+                FROM utilisateurs u
+                LEFT JOIN participations p ON p.utilisateur_id = u.id
+                LEFT JOIN parties pa ON pa.id = p.partie_id AND pa.statut = 'terminee'
+                GROUP BY u.id
+            ) AS t
+            ORDER BY {ordre}, t.pseudo COLLATE NOCASE ASC
             LIMIT ?
             """,
             (limit,),
@@ -481,12 +526,12 @@ def classement(limit=20):
 def historique_utilisateur(user_id, limit=10):
     """
     Dernières parties d'un joueur (pour le profil et la fiche joueur).
-    Retour : liste de dict (code, statut, dates, score, a_gagne, vainqueur_id).
+    Retour : liste de dict (code, statut, nb_joueurs, dates, score, a_gagne, vainqueur_id).
     """
     with db_cursor() as cur:
         cur.execute(
             """
-            SELECT pa.code, pa.statut, pa.date_creation, pa.date_fin,
+            SELECT pa.code, pa.statut, pa.nb_joueurs, pa.date_creation, pa.date_fin,
                    p.score, p.a_gagne, pa.vainqueur_id
             FROM participations p
             JOIN parties pa ON pa.id = p.partie_id
