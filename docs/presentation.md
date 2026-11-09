@@ -21,12 +21,16 @@ Slither.io, avec un vrai site autour :
 
 1. **comptes joueurs** stockés dans une base SQLite (inscription, connexion,
    profil, gestion complète des joueurs) ;
-2. **duel 1 contre 1 en temps réel** : un joueur crée une salle, envoie le code
-   à 6 caractères à un ami, et la partie démarre dès que l’ami le tape ;
+2. **parties en temps réel à 2 ou 3 joueurs** : un joueur crée une salle en
+   choisissant 2 ou 3 joueurs, envoie le code à 6 caractères à ses amis, et la
+   partie démarre quand la salle est pleine. Le dernier serpent en vie gagne ;
+   six bonus (turbo, bouclier, fantôme, aimant, ciseaux, gel) ;
 3. **mode solo** pour s’entraîner et gagner des **coins** ;
 4. **boutique** : les coins débloquent des couleurs de serpent (rouge, vert,
    orange, jaune) ; tout le reste du site est en noir et blanc ;
-5. **classement** calculé en SQL à partir des parties enregistrées.
+5. **classement** calculé en SQL à partir des parties enregistrées : podium,
+   tri par victoires, % de victoires, meilleur score ou coins, statistiques
+   par joueur (parties, victoires, nuls, défaites).
 
 Le serveur web est écrit en **Python avec Flask**, le temps réel utilise
 **Flask-SocketIO** (WebSocket), la base est **SQLite** (langage SQL) et
@@ -51,13 +55,13 @@ Pages du site :
 
 | Page | Contenu |
 |---|---|
-| Accueil | Présentation, bouton **Jouer** |
+| Accueil | Arène animée en fond, présentation, bouton **Jouer**, liste des bonus |
 | Inscription / Connexion | Formulaires validés client + serveur |
-| Jouer | Choix solo ou 1v1, créer / rejoindre une salle |
-| Partie | Plateau 1v1 temps réel, scores, compte à rebours |
-| Solo | Plateau solo, pause, coins en fin de partie |
+| Jouer | Choix solo ou multijoueur, créer une salle (2 ou 3) / rejoindre |
+| Partie | Plateau temps réel à 2 ou 3, scores, effets actifs, compte à rebours, écran de fin animé |
+| Solo | Plateau solo, pause, effets actifs, écran de fin |
 | Boutique | Achat et équipement des skins |
-| Classement | Victoires, scores, parties, coins |
+| Classement | Podium, tri, victoires / nuls / défaites, % de victoires, meilleur score, coins |
 | Profil | E-mail, mot de passe, historique |
 | Gestion joueurs | CRUD complet (lien en pied de page) |
 
@@ -81,7 +85,12 @@ Pages du site :
 | 12 | Tests automatiques du moteur (`tests/`) | Fait |
 | 13 | Documentation (README, schéma, architecture, améliorations) | Fait |
 | 14 | Mise en ligne sur un serveur et dépôt GitHub | Fait |
-| 15 | Préparation de l’oral | À faire |
+| 15 | Ralentir le jeu (une seule constante de vitesse) | Fait |
+| 16 | Parties à 3 joueurs (BDD, moteur, lobby) | Fait |
+| 17 | Quatre nouveaux bonus + minuteurs dans le HUD | Fait |
+| 18 | Écrans de fin animés, classement avec podium et tri | Fait |
+| 19 | Arène animée sur l’accueil, page bloquée pendant le jeu | Fait |
+| 20 | Préparation de l’oral | À faire |
 
 ---
 
@@ -105,7 +114,7 @@ Pages du site :
 Voir **[schema.md](schema.md)** (diagramme, tables, requêtes) et `schema.sql`.
 
 - `utilisateurs` : les comptes (pseudo, e-mail, hash, skin, coins) ;
-- `parties` : les salles 1v1 (code, statut, créateur, vainqueur) ;
+- `parties` : les salles (code, statut, nombre de joueurs 2 ou 3, créateur, vainqueur) ;
 - `participations` : qui a joué quelle partie, avec quel score (table d’association).
 
 Le fonctionnement complet (routes, événements temps réel, flux des données)
@@ -122,6 +131,7 @@ est décrit dans **[architecture.md](architecture.md)**.
 | v3 | Mise en ligne sur un serveur (port configurable) |
 | v4 | Interface strictement noir et blanc, serpent animé en fond |
 | v5 | Audit complet : corrections de bugs, sécurité (CSRF, anti-triche), contrôles mobiles, compte à rebours, tests, commentaires et documentation |
+| v6 | Jeu ralenti (7 pas/s), parties à 3, 4 nouveaux bonus, écrans de fin animés, classement avec podium et tri, arène animée sur l’accueil, page bloquée pendant le jeu, comptes Shai / zoubida / noah |
 
 ---
 
@@ -147,6 +157,15 @@ est décrit dans **[architecture.md](architecture.md)**.
 | Injection SQL | Requêtes paramétrées uniquement (`?`) |
 | Pas jouable sur téléphone | Glisser du doigt + flèches à l’écran (`controles.js`) |
 | Gris dans l’interface (transparence) | Dessin uniquement en `#000` / `#fff`, contours au lieu de transparence |
+| Le jeu était trop rapide, et la vitesse était recopiée à plusieurs endroits (Python et JS) | Une seule constante `TICKS_PAR_SECONDE` ; toutes les durées sont en secondes converties par `secondes()` ; le solo reçoit les réglages du serveur |
+| À 3 joueurs, la règle « tête contre tête » ne marchait que pour une paire | Test de **chaque paire** de serpents ; à 3 sur la même case, seul le plus long survit |
+| Un joueur qui quittait la salle d’attente puis un nouvel arrivant pouvaient avoir la même case de départ | Les places sont données au démarrage, d’après l’ordre final des joueurs |
+| Départs à 3 : risque qu’un joueur soit avantagé | Trois colonnes parallèles, même distance au mur pour chacun (vérifié par un test) |
+| Les mots de passe `1234` demandés pour 3 comptes sont plus courts que la règle du formulaire (6 caractères) | Les comptes sont créés directement par le serveur (`python app.py --comptes`) ; la règle reste pour les inscriptions |
+| Le tri du classement vient de l’URL : risque d’injection SQL | Liste blanche `TRIS_CLASSEMENT` : on choisit une clause `ORDER BY` connue, jamais le texte reçu |
+| Ancienne base sans la colonne `nb_joueurs` | `migrer_si_besoin()` fait `ALTER TABLE parties ADD COLUMN` sans perdre de données |
+| La page défilait avec la molette ou les flèches pendant la partie | Page en `100vh` sans débordement + `preventDefault()` sur molette, doigt et touches (`passive: false`) |
+| Le serpent décoratif de l’accueil ressemblait à quelques carrés perdus | Arène plein écran avec plusieurs serpents automatiques (pommes, collisions, réapparition), textes sur panneaux noirs pleins |
 
 ---
 
@@ -155,10 +174,12 @@ est décrit dans **[architecture.md](architecture.md)**.
 - **Analyser et modéliser** : flux navigateur ↔ Flask ↔ SQLite, et navigateur ↔
   Socket.IO pour le temps réel.
 - **Décomposer** : `app.py` (web), `database.py` (SQL), `game_engine.py` (règles)
-  séparés ; `dessin.js` et `controles.js` réutilisés par le solo et le 1v1.
+  séparés ; `dessin.js`, `controles.js` et `fin.js` réutilisés par le solo et le
+  multijoueur.
 - **Traduire des algorithmes** : déplacement par file (tête ajoutée, queue
-  retirée), détection de collisions, règle tête contre tête, algorithme glouton du
-  serpent décoratif.
+  retirée), détection de collisions par paires, règle tête contre tête, aimant
+  (distance de Manhattan), ennemi le plus proche, tirage pondéré des bonus,
+  algorithme glouton des serpents de l’arène, particules (vitesse + gravité).
 - **Valider** : tests `unittest` du moteur, tests manuels des pages et du CRUD.
 - **Informations** : acquisition (formulaires), mémorisation (SQL), traitement
   (Python), diffusion (pages HTML, WebSocket).
@@ -170,8 +191,8 @@ est décrit dans **[architecture.md](architecture.md)**.
 
 Liste détaillée et classée : **[ameliorations.md](ameliorations.md)**.
 Principales idées : bouton revanche, meilleur score solo en base, limite des
-essais de connexion, file d’attente automatique, mode spectateur, table
-`skins` normalisée.
+essais de connexion, file d’attente automatique, mode spectateur, rang
+d’élimination dans les parties à 3, table `skins` normalisée.
 
 ---
 
@@ -185,7 +206,7 @@ Tout le code est dans le dépôt GitHub :
 - `schema.sql` : création des tables
 - `templates/` : pages HTML (Jinja)
 - `static/css/style.css` : apparence
-- `static/js/` : validation, lobby, solo, 1v1, dessin, contrôles, décor
+- `static/js/` : validation, lobby, solo, partie, dessin, contrôles, écrans de fin, arène
 - `tests/test_game_engine.py` : tests automatiques
 
 Tous les fichiers sont commentés en français.

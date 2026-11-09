@@ -28,6 +28,7 @@ erDiagram
         INTEGER id PK
         TEXT code UK
         TEXT statut
+        INTEGER nb_joueurs
         INTEGER createur_id FK
         INTEGER vainqueur_id FK
         TEXT date_creation
@@ -69,6 +70,7 @@ parties (relation plusieurs-à-plusieurs) et porte le score de chaque joueur.
 | `id` | INTEGER | PK | Identifiant |
 | `code` | TEXT | NOT NULL, UNIQUE | Code de salle (6 caractères A-Z 0-9) |
 | `statut` | TEXT | NOT NULL, défaut `attente` | `attente` → `en_cours` → `terminee` |
+| `nb_joueurs` | INTEGER | NOT NULL, défaut 2, `CHECK (nb_joueurs IN (2, 3))` | Taille de la salle choisie par le créateur (ajoutée en v6 ; une ancienne base est migrée par `migrer_si_besoin()`) |
 | `createur_id` | INTEGER | FK → utilisateurs, ON DELETE CASCADE | Créateur de la salle |
 | `vainqueur_id` | INTEGER | FK → utilisateurs, NULL, ON DELETE SET NULL | Gagnant (NULL = nul ou pas fini) |
 | `date_creation` | TEXT | NOT NULL | Création |
@@ -85,7 +87,7 @@ parties (relation plusieurs-à-plusieurs) et porte le score de chaque joueur.
 | `a_gagne` | INTEGER | défaut 0 | 1 si vainqueur |
 
 Contrainte `UNIQUE (utilisateur_id, partie_id)` : un joueur n’apparaît qu’une
-fois par partie. Index : `idx_participations_score`, `idx_parties_code`.
+fois par partie. Une partie à 3 a donc **3 lignes** dans `participations`. Index : `idx_participations_score`, `idx_parties_code`.
 
 ## Opérations CRUD
 
@@ -128,7 +130,14 @@ DELETE FROM parties WHERE createur_id = ?;      -- leurs participations partent 
 DELETE FROM utilisateurs WHERE id = ?;          -- ses participations aussi
 ```
 
-Clôture d’une partie (le `statut != 'terminee'` évite de payer deux fois) :
+Création d’une salle de 2 ou 3 joueurs :
+
+```sql
+INSERT INTO parties (code, statut, createur_id, nb_joueurs) VALUES (?, 'attente', ?, ?);
+```
+
+Clôture d’une partie (le `statut != 'terminee'` évite de payer deux fois ; la
+mise à jour des participations est faite pour chacun des 2 ou 3 joueurs) :
 
 ```sql
 UPDATE parties
@@ -139,25 +148,52 @@ UPDATE participations SET score = ?, a_gagne = ?
 WHERE partie_id = ? AND utilisateur_id = ?;
 ```
 
-Classement (jointures externes + agrégats, seules les parties terminées comptent) :
+Classement (page `/classement`, fonction `database.classement`).
+Une **sous-requête** calcule les totaux de chaque joueur, la requête extérieure
+en déduit les défaites et le pourcentage de victoires :
 
 ```sql
-SELECT u.id, u.pseudo, u.couleur_skin, u.coins,
-       COUNT(pa.id)                AS parties_jouees,
-       COALESCE(SUM(p.a_gagne), 0) AS victoires,
-       COALESCE(SUM(p.score), 0)   AS score_total
-FROM utilisateurs u
-LEFT JOIN participations p ON p.utilisateur_id = u.id
-LEFT JOIN parties pa ON pa.id = p.partie_id AND pa.statut = 'terminee'
-GROUP BY u.id
-ORDER BY victoires DESC, score_total DESC, u.coins DESC, u.pseudo ASC
+SELECT t.*,
+       t.parties_jouees - t.victoires - t.nuls AS defaites,
+       CASE WHEN t.parties_jouees = 0 THEN 0
+            ELSE ROUND(100.0 * t.victoires / t.parties_jouees, 1)
+       END AS ratio
+FROM (
+    SELECT
+        u.id, u.pseudo, u.couleur_skin, u.coins,
+        COUNT(pa.id) AS parties_jouees,
+        COALESCE(SUM(CASE WHEN pa.vainqueur_id = u.id THEN 1 ELSE 0 END), 0) AS victoires,
+        COALESCE(SUM(CASE WHEN pa.id IS NOT NULL AND pa.vainqueur_id IS NULL
+                          THEN 1 ELSE 0 END), 0) AS nuls,
+        COALESCE(MAX(CASE WHEN pa.id IS NOT NULL THEN p.score END), 0) AS meilleur_score,
+        COALESCE(SUM(CASE WHEN pa.id IS NOT NULL THEN p.score END), 0) AS score_total
+    FROM utilisateurs u
+    LEFT JOIN participations p ON p.utilisateur_id = u.id
+    LEFT JOIN parties pa ON pa.id = p.partie_id AND pa.statut = 'terminee'
+    GROUP BY u.id
+) AS t
+ORDER BY victoires DESC, ratio DESC, meilleur_score DESC, t.pseudo COLLATE NOCASE ASC
 LIMIT ?;
 ```
+
+Explications :
+
+- `LEFT JOIN` : un joueur qui n’a jamais joué apparaît quand même (avec 0).
+- La condition `pa.statut = 'terminee'` est dans le `ON` : les salles en
+  attente ou abandonnées ne comptent pas, sans faire disparaître le joueur.
+- `CASE WHEN … THEN 1 ELSE 0 END` + `SUM` = « compter les lignes qui
+  vérifient une condition » (victoires, nuls).
+- Match nul = partie terminée avec `vainqueur_id` à `NULL`. Limite connue : si
+  le vainqueur supprime son compte, `vainqueur_id` passe à `NULL` et la partie
+  compte alors comme un nul pour les autres.
+- La ligne `ORDER BY` change selon l’onglet choisi (`?tri=victoires`, `ratio`,
+  `score`, `coins`). Elle est prise dans le dictionnaire `TRIS_CLASSEMENT` (liste
+  blanche) : le texte de l’URL n’est jamais collé dans la requête.
 
 Historique d’un joueur :
 
 ```sql
-SELECT pa.code, pa.statut, pa.date_creation, pa.date_fin,
+SELECT pa.code, pa.statut, pa.nb_joueurs, pa.date_creation, pa.date_fin,
        p.score, p.a_gagne, pa.vainqueur_id
 FROM participations p
 JOIN parties pa ON pa.id = p.partie_id
