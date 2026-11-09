@@ -1,5 +1,6 @@
+{# accueil.html — Page de présentation : titre, accroche et gros bouton Jouer. #}
 {% extends "base.html" %}
-{% block title %}Serpentix — Affronte. Grandis. Domine.{% endblock %}
+{% block title %}Serpentix · Affronte. Grandis. Domine.{% endblock %}
 {% block container_class %}wide{% endblock %}
 {% block content %}
 <section class="landing">
@@ -8,9 +9,10 @@
     <h1>SERPENTIX</h1>
     <p class="lead">
       Mange des pommes, grandis, et élimine l’adversaire en touchant son corps.
-      Solo pour farmer des coins — ou envoie un code à un ami pour le 1v1.
+      Solo pour gagner des coins, ou envoie un code à un ami pour le 1v1.
     </p>
     <div class="landing-cta">
+      {# Le bouton Jouer mène au jeu si on est connecté, sinon à la connexion #}
       {% if current_user %}
         <a class="btn btn-primary btn-xl" href="{{ url_for('jouer') }}">Jouer</a>
         <a class="btn btn-ghost" href="{{ url_for('boutique') }}">Boutique</a>
@@ -21,6 +23,7 @@
     </div>
   </div>
 
+  <!-- Trois arguments du jeu -->
   <div class="landing-features">
     <article class="feature">
       <div class="num">01</div>
@@ -30,12 +33,12 @@
     <article class="feature">
       <div class="num">02</div>
       <h3>Coins &amp; skins</h3>
-      <p>Gagne des coins en jouant. Débloque rouge, vert, orange ou jaune — le site reste noir &amp; blanc.</p>
+      <p>Gagne des coins en jouant. Débloque rouge, vert, orange ou jaune : le site reste noir &amp; blanc.</p>
     </article>
     <article class="feature">
       <div class="num">03</div>
       <h3>Bonus</h3>
-      <p>Attrape le turbo pour accélérer, ou le bouclier pour survivre à un choc.</p>
+      <p>Attrape le turbo △ pour accélérer, ou le bouclier ○ pour survivre à un choc.</p>
     </article>
   </div>
 </section>

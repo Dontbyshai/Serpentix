@@ -1,0 +1,26 @@
+{# _historique.html — Tableau des dernières parties (inclus dans profil et fiche joueur).
+   Variable attendue : historique (liste renvoyée par database.historique_utilisateur). #}
+{% if historique %}
+<div class="table-wrap">
+<table class="table">
+  <thead><tr><th>Code</th><th>Date</th><th>Score</th><th>Résultat</th></tr></thead>
+  <tbody>
+  {% for h in historique %}
+    <tr>
+      <td><code>{{ h.code }}</code></td>
+      <td>{{ h.date_creation }}</td>
+      <td>{{ h.score }}</td>
+      <td>
+        {% if h.statut != 'terminee' %}{{ 'En attente' if h.statut == 'attente' else 'En cours' }}
+        {% elif h.a_gagne %}Victoire
+        {% elif h.vainqueur_id is none %}Nul
+        {% else %}Défaite{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="muted">Aucune partie pour l’instant : lance un 1v1 depuis Jouer.</p>
+{% endif %}

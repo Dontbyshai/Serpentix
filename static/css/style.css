@@ -1,10 +1,19 @@
 /* ============================================================
-   Serpentix — UI 100 % noir & blanc
-   Aucun gris dans l’interface. Couleurs (R/V/O/J) = skins uniquement.
+   Serpentix — feuille de style unique du site
+   ------------------------------------------------------------
+   Règle de design : interface 100 % noir (#000) et blanc (#fff),
+   AUCUN gris et aucune transparence (opacity < 1 donnerait du gris).
+   Les seules couleurs du site sont celles des skins des serpents
+   (rouge, vert, orange, jaune), appliquées en style="" par Jinja.
+
+   Organisation : variables → base → en-tête → mise en page →
+   boutons → accueil → cartes → formulaires → boutique → jeu →
+   tableaux → utilitaires → responsive (mobile).
    ============================================================ */
 
 @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap");
 
+/* Variables CSS : on change une couleur ici, elle change partout */
 :root {
   --bg: #000000;
   --fg: #ffffff;
@@ -473,12 +482,15 @@ canvas#game {
   font-family: var(--mono);
 }
 .hud-stat { font-family: var(--mono); font-size: 1.1rem; }
+/* Fenêtre de fin : seule la boîte est opaque, le plateau final reste visible */
 .overlay {
   position: fixed; inset: 0;
-  background: #000000;
+  background: transparent;
+  pointer-events: none;      /* les clics passent à travers… */
   display: grid; place-items: center;
   z-index: 100;
 }
+.overlay-box { pointer-events: auto; }  /* …sauf sur la boîte et ses boutons */
 .overlay.hidden { display: none; }
 .overlay-box {
   background: #000000;
@@ -529,11 +541,67 @@ canvas#game {
   color: #ffffff;
 }
 
-/* Pages avec fond animé un peu plus discret */
-body.has-bg-snake .container,
-body.has-bg-snake .landing {
-  /* contenu reste lisible grâce au fond noir opaque des cartes */
+/* Le bouton « S'inscrire » du menu : texte noir sur fond blanc (sinon invisible) */
+.nav a.btn-primary { color: #000000; }
+.nav a.btn-primary:hover { color: #ffffff; }
+
+/* Textes de l'accueil sur fond noir : le serpent décoratif passe DERRIÈRE
+   sans gêner la lecture (pas besoin de transparence) */
+.landing-hero .eyebrow, .landing-hero h1, .landing-hero .lead {
+  background: #000000;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 0.5rem;
 }
+.board { min-width: 0; }
+
+/* ----- Utilitaires (petites classes réutilisables) ----- */
+.center { text-align: center; }
+.mt { margin-top: 1rem; }
+.mt-sm { margin-top: 0.5rem; }
+.mt-lg { margin-top: 2.5rem; }
+.ml { margin-left: 0.4rem; }
+.inline { display: inline; }
+.btn-block { width: 100%; }
+.form.full { max-width: 100%; }
+.mode-grid { margin-bottom: 1.5rem; }
+.code-input { text-transform: uppercase; letter-spacing: 0.2em; font-family: var(--mono); }
+.fiche { list-style: none; padding: 0; }
+.actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; }
+.actions-cell { white-space: nowrap; }
+/* Les grands tableaux défilent horizontalement sur téléphone au lieu de déborder */
+.table-wrap { overflow-x: auto; }
+
+/* ----- Croix directionnelle tactile (_dpad.html) ----- */
+/* Cachée par défaut (ordinateur) ; affichée sur écran tactile ou petit écran */
+.dpad {
+  display: none;
+  grid-template-columns: repeat(3, 64px);
+  grid-template-rows: repeat(2, 64px);
+  gap: 6px;
+  justify-content: center;
+  margin: 1rem auto 0;
+  user-select: none;
+}
+.dpad button {
+  border: 1px solid #ffffff;
+  background: #000000;
+  color: #ffffff;
+  border-radius: var(--radius-sm);
+  font-size: 1.3rem;
+  touch-action: manipulation;   /* pas de zoom au double-tap */
+}
+.dpad button:active { background: #ffffff; color: #000000; }
+.dpad-up { grid-column: 2; grid-row: 1; }
+.dpad-left { grid-column: 1; grid-row: 2; }
+.dpad-down { grid-column: 2; grid-row: 2; }
+.dpad-right { grid-column: 3; grid-row: 2; }
+@media (pointer: coarse), (max-width: 860px) {
+  .dpad { display: grid; }
+}
+/* Le plateau capte le doigt : la page ne défile pas pendant qu'on glisse */
+canvas#solo-canvas, canvas#game { touch-action: none; }
 
 /* ----- Responsive ----- */
 @media (max-width: 860px) {

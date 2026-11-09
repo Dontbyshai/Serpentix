@@ -1,35 +1,37 @@
+{# inscription.html — CREATE : formulaire d'inscription (validation JS + Python). #}
 {% extends "base.html" %}
-{% block title %}Inscription — Serpentix{% endblock %}
+{% block title %}Inscription · Serpentix{% endblock %}
 {% block content %}
 <div class="auth-box">
   <h1>Créer un compte</h1>
   <p class="sub">Skin blanc gratuit. Les couleurs se débloquent avec des coins.</p>
-  <form class="form" method="post" id="form-inscription" novalidate style="max-width:100%">
+  <form class="form full" method="post" id="form-inscription" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="field">
       <label for="pseudo">Pseudo</label>
+      {# Les attributs HTML (minlength, pattern…) sont une 1re barrière côté client #}
       <input type="text" id="pseudo" name="pseudo" value="{{ valeurs.pseudo }}" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_\-]+" autocomplete="username">
+      {# Message d'erreur : rempli par validation.js OU par le serveur (erreurs) #}
       <span class="err" data-for="pseudo">{{ erreurs.get('pseudo', '') }}</span>
     </div>
     <div class="field">
       <label for="email">E-mail</label>
-      <input type="email" id="email" name="email" value="{{ valeurs.email }}" required autocomplete="email">
+      <input type="email" id="email" name="email" value="{{ valeurs.email }}" required maxlength="100" autocomplete="email">
       <span class="err" data-for="email">{{ erreurs.get('email', '') }}</span>
     </div>
     <div class="field">
       <label for="mot_de_passe">Mot de passe</label>
-      <input type="password" id="mot_de_passe" name="mot_de_passe" required minlength="6" autocomplete="new-password">
+      <input type="password" id="mot_de_passe" name="mot_de_passe" required minlength="6" maxlength="100" autocomplete="new-password">
       <span class="err" data-for="mot_de_passe">{{ erreurs.get('mot_de_passe', '') }}</span>
     </div>
     <div class="field">
       <label for="mot_de_passe2">Confirmer</label>
-      <input type="password" id="mot_de_passe2" name="mot_de_passe2" required minlength="6" autocomplete="new-password">
+      <input type="password" id="mot_de_passe2" name="mot_de_passe2" required minlength="6" maxlength="100" autocomplete="new-password">
       <span class="err" data-for="mot_de_passe2">{{ erreurs.get('mot_de_passe2', '') }}</span>
     </div>
-    <button type="submit" class="btn btn-primary btn-xl" style="width:100%">Créer et jouer</button>
+    <button type="submit" class="btn btn-primary btn-xl btn-block">Créer et jouer</button>
   </form>
-  <p class="muted" style="text-align:center;margin-top:1.25rem">
-    Déjà inscrit ? <a href="{{ url_for('connexion') }}">Connexion</a>
-  </p>
+  <p class="muted center mt">Déjà inscrit ? <a href="{{ url_for('connexion') }}">Connexion</a></p>
 </div>
 {% endblock %}
 {% block scripts %}

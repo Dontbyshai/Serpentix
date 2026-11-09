@@ -1,53 +1,72 @@
 /**
- * solo.js — Mode entraînement client + crédit de coins en fin de partie
+ * solo.js — Mode solo : toute la partie tourne dans le navigateur.
+ *
+ * Les règles sont les MÊMES que celles du serveur (game_engine.py) :
+ * grille 40 x 30, 10 tours par seconde, 3 pommes, turbo et bouclier.
+ * À la fin, on envoie le score au serveur qui crédite les coins
+ * (le serveur vérifie que le score est plausible : voir app.py, api_solo_fin).
  */
 (function () {
   const canvas = document.getElementById("solo-canvas");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
+  if (!canvas) return;                      // pas sur la page solo : on ne fait rien
+
+  // --- Éléments de la page ---------------------------------------------------
   const scoreEl = document.getElementById("solo-score");
   const gainEl = document.getElementById("solo-gain");
-  const btn = document.getElementById("solo-restart");
-  const again = document.getElementById("solo-again");
+  const btnRestart = document.getElementById("solo-restart");
+  const btnAgain = document.getElementById("solo-again");
   const overlay = document.getElementById("fin-overlay");
   const finMsg = document.getElementById("fin-msg");
-  const SKIN = window.SERPENTIX_SKIN || "#ffffff";
+  const SKIN = window.SERPENTIX_SKIN || "#ffffff";   // couleur du skin équipé
+  // Jeton anti-CSRF lu dans <meta name="csrf-token"> (voir base.html)
+  const CSRF = document.querySelector('meta[name="csrf-token"]').content;
 
+  // --- Constantes (identiques à game_engine.py) ------------------------------
   const COLS = 40, ROWS = 30;
-  const cw = canvas.width / COLS, ch = canvas.height / ROWS;
+  const TICK_MS = 100;            // 10 tours par seconde
+  const DUREE_TURBO = 30;         // 3 s
+  const DECOMPTE = 30;            // 3 s de compte à rebours
+  const COINS_MAX = 80;           // plafond affiché (le serveur l'applique aussi)
 
-  let serpent, dir, nextDir, pommes, bonus, score, vivant, bouclier, turbo, grandir, timer;
-  let coinsEnvoyes = false;
+  // --- État de la partie -------------------------------------------------------
+  let corps, direction, file, pommes, bonus, score, vivant, bouclier, turbo,
+    grandir, decompte, enPause, timer;
 
+  /** Remet tout à zéro et lance une nouvelle partie. */
   function reset() {
-    serpent = [[8, 15], [7, 15], [6, 15]];
-    dir = [1, 0];
-    nextDir = [1, 0];
+    corps = [[8, 15], [7, 15], [6, 15]];   // tête = corps[0]
+    direction = [1, 0];
+    file = [];                              // virages en attente (comme le serveur)
     score = 0;
     vivant = true;
     bouclier = false;
     turbo = 0;
     grandir = 0;
+    decompte = DECOMPTE;
+    enPause = false;
     pommes = [];
     bonus = [];
-    coinsEnvoyes = false;
-    if (overlay) overlay.classList.add("hidden");
-    spawnPommes();
-    spawnBonus();
-    scoreEl.textContent = "0";
-    if (gainEl) gainEl.textContent = "0";
-    if (timer) clearInterval(timer);
-    timer = setInterval(tick, 100);
-    draw();
+    overlay.classList.add("hidden");
+    placerPommes();
+    placerBonus();
+    afficherScore();
+    clearInterval(timer);
+    timer = setInterval(tick, TICK_MS);
+    // On prévient le serveur que la partie commence (il note l'heure)
+    fetch("/api/solo/debut", { method: "POST", headers: { "X-CSRF-Token": CSRF } })
+      .catch(function () { /* hors-ligne : la partie ne rapportera pas de coins */ });
+    dessiner();
   }
 
+  /** @returns {Set<string>} cases occupées, sous forme de texte "x,y" */
   function occupees() {
-    const s = new Set(serpent.map(function (p) { return p[0] + "," + p[1]; }));
+    const s = new Set(corps.map(function (p) { return p[0] + "," + p[1]; }));
     pommes.forEach(function (p) { s.add(p[0] + "," + p[1]); });
     bonus.forEach(function (b) { s.add(b.pos[0] + "," + b.pos[1]); });
     return s;
   }
 
+  /** @returns {number[]|null} une case libre au hasard, ou null */
   function caseLibre() {
     const o = occupees();
     const libres = [];
@@ -59,7 +78,7 @@
     return libres.length ? libres[Math.floor(Math.random() * libres.length)] : null;
   }
 
-  function spawnPommes() {
+  function placerPommes() {
     while (pommes.length < 3) {
       const c = caseLibre();
       if (!c) break;
@@ -67,7 +86,7 @@
     }
   }
 
-  function spawnBonus() {
+  function placerBonus() {
     while (bonus.length < 2) {
       const c = caseLibre();
       if (!c) break;
@@ -75,145 +94,135 @@
     }
   }
 
-  async function crediterCoins() {
-    if (coinsEnvoyes) return;
-    coinsEnvoyes = true;
+  function afficherScore() {
+    scoreEl.textContent = String(score);
+    gainEl.textContent = String(Math.min(score, COINS_MAX));
+  }
+
+  /**
+   * Mémorise un virage (appelée par controles.js).
+   * @param {number} dx
+   * @param {number} dy
+   */
+  function changerDirection(dx, dy) {
+    if (!vivant || enPause) return;
+    const ref = file.length ? file[file.length - 1] : direction;
+    if (dx === ref[0] && dy === ref[1]) return;     // déjà cette direction
+    if (dx === -ref[0] && dy === -ref[1]) return;   // demi-tour interdit
+    if (file.length < 2) file.push([dx, dy]);
+  }
+
+  /** @returns {boolean} vrai si la case est un mur ou dans le corps (hors tête) */
+  function estMortelle(c) {
+    if (c[0] < 0 || c[1] < 0 || c[0] >= COLS || c[1] >= ROWS) return true;
+    return corps.slice(1).some(function (p) { return p[0] === c[0] && p[1] === c[1]; });
+  }
+
+  /** Avance d'une case. @returns {boolean} faux si le serpent est mort */
+  function unPas() {
+    const sauvegarde = { corps: corps.slice(), grandir: grandir };
+    if (file.length) direction = file.shift();
+    const tete = [corps[0][0] + direction[0], corps[0][1] + direction[1]];
+    corps.unshift(tete);
+    if (grandir > 0) grandir--;
+    else corps.pop();                       // la queue avance aussi
+
+    if (estMortelle(tete)) {
+      if (!bouclier) return false;
+      // Bouclier : on annule le pas puis on tourne vers une case libre
+      bouclier = false;
+      corps = sauvegarde.corps;
+      grandir = sauvegarde.grandir;
+      file = [];
+      const perp = [[direction[1], -direction[0]], [-direction[1], direction[0]]];
+      for (const d of perp) {
+        const c = [corps[0][0] + d[0], corps[0][1] + d[1]];
+        if (!estMortelle(c)) { direction = d; break; }
+      }
+      return true;
+    }
+
+    // Pomme mangée ?
+    const i = pommes.findIndex(function (p) { return p[0] === tete[0] && p[1] === tete[1]; });
+    if (i >= 0) {
+      pommes.splice(i, 1);
+      score++;
+      grandir++;
+      afficherScore();
+    }
+    // Bonus attrapé ?
+    const j = bonus.findIndex(function (b) { return b.pos[0] === tete[0] && b.pos[1] === tete[1]; });
+    if (j >= 0) {
+      if (bonus[j].type === "turbo") turbo = DUREE_TURBO;
+      else bouclier = true;
+      bonus.splice(j, 1);
+    }
+    return true;
+  }
+
+  /** Un tour de jeu (toutes les 100 ms). */
+  function tick() {
+    if (!vivant || enPause) return;
+    if (decompte > 0) { decompte--; dessiner(); return; }
+    const pas = turbo > 0 ? 2 : 1;          // turbo = 2 cases par tour
+    for (let k = 0; k < pas; k++) {
+      if (!unPas()) { finDePartie(); return; }
+    }
+    if (turbo > 0) turbo--;
+    placerPommes();
+    if (Math.random() < 0.02) placerBonus(); // ≈ 1 bonus toutes les 5 s
+    dessiner();
+  }
+
+  /** Arrête la partie et demande les coins au serveur. */
+  async function finDePartie() {
+    vivant = false;
+    clearInterval(timer);
+    dessiner();
+    overlay.classList.remove("hidden");
+    finMsg.textContent = "Score " + score + "…";
     try {
       const res = await fetch("/api/solo/fin", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
         body: JSON.stringify({ score: score }),
       });
       const data = await res.json();
       if (data.ok) {
-        if (gainEl) gainEl.textContent = String(data.gain);
-        if (finMsg) {
-          finMsg.textContent = "Score " + score + " · +" + data.gain + " coins (solde " + data.coins + ")";
-        }
+        gainEl.textContent = String(data.gain);
+        finMsg.textContent = "Score " + score + " · +" + data.gain + " coins (solde " + data.coins + ")";
+        // Met à jour le compteur de coins du menu sans recharger la page
+        const navCoins = document.querySelector(".nav-coins");
+        if (navCoins) navCoins.textContent = "◈ " + data.coins;
+      } else {
+        finMsg.textContent = "Score " + score + " · " + (data.erreur || "coins non crédités");
       }
     } catch (e) {
-      if (finMsg) finMsg.textContent = "Score " + score + " (coins non crédités — réseau)";
+      finMsg.textContent = "Score " + score + " (coins non crédités : réseau)";
     }
   }
 
-  function gameOver() {
-    vivant = false;
-    if (overlay) overlay.classList.remove("hidden");
-    if (finMsg) finMsg.textContent = "Score " + score + "…";
-    crediterCoins();
-    draw();
+  /** Dessine avec le module partagé dessin.js (même rendu que le 1v1). */
+  function dessiner() {
+    Dessin.plateau(canvas, {
+      largeur: COLS, hauteur: ROWS, pommes: pommes, bonus: bonus,
+      serpents: [{ corps: corps, couleur: SKIN, vivant: vivant, bouclier: bouclier }],
+    });
+    if (decompte > 0) Dessin.texteCentre(canvas, String(Math.ceil(decompte / 10)));
+    else if (enPause) Dessin.texteCentre(canvas, "PAUSE");
   }
 
-  function tick() {
-    if (!vivant) return;
-    dir = nextDir;
-    const steps = turbo > 0 ? 2 : 1;
-    if (turbo > 0) turbo--;
-    for (let s = 0; s < steps; s++) {
-      const head = [serpent[0][0] + dir[0], serpent[0][1] + dir[1]];
-      const mur = head[0] < 0 || head[1] < 0 || head[0] >= COLS || head[1] >= ROWS;
-      const soi = serpent.some(function (p) { return p[0] === head[0] && p[1] === head[1]; });
-      if (mur || soi) {
-        if (bouclier) {
-          bouclier = false;
-          break;
-        }
-        gameOver();
-        return;
-      }
-      serpent.unshift(head);
-      if (grandir > 0) grandir--;
-      else serpent.pop();
-
-      for (let i = 0; i < pommes.length; i++) {
-        if (pommes[i][0] === head[0] && pommes[i][1] === head[1]) {
-          pommes.splice(i, 1);
-          score++;
-          grandir++;
-          scoreEl.textContent = String(score);
-          if (gainEl) gainEl.textContent = String(Math.min(score, 80));
-          break;
-        }
-      }
-      for (let i = 0; i < bonus.length; i++) {
-        if (bonus[i].pos[0] === head[0] && bonus[i].pos[1] === head[1]) {
-          if (bonus[i].type === "turbo") turbo = 40;
-          else bouclier = true;
-          bonus.splice(i, 1);
-          break;
-        }
-      }
-    }
-    spawnPommes();
-    if (Math.random() < 0.02) spawnBonus();
-    draw();
-  }
-
-  function draw() {
-    // Plateau noir & blanc uniquement
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
-        if ((x + y) % 2 === 0) {
-          ctx.fillStyle = "#0a0a0a";
-          ctx.fillRect(x * cw, y * ch, cw, ch);
-        }
-      }
-    }
-    // Pommes = cercles blancs (pas de couleur UI)
-    pommes.forEach(function (p) {
-      ctx.beginPath();
-      ctx.fillStyle = "#ffffff";
-      ctx.arc(p[0] * cw + cw / 2, p[1] * ch + ch / 2, Math.min(cw, ch) * 0.32, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    bonus.forEach(function (b) {
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 2;
-      const x = b.pos[0] * cw + cw / 2;
-      const y = b.pos[1] * ch + ch / 2;
-      if (b.type === "turbo") {
-        ctx.beginPath();
-        ctx.moveTo(x, y - 7);
-        ctx.lineTo(x + 6, y + 6);
-        ctx.lineTo(x - 6, y + 6);
-        ctx.closePath();
-        ctx.stroke();
-      } else {
-        ctx.beginPath();
-        ctx.arc(x, y, 7, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    });
-    serpent.forEach(function (seg, i) {
-      ctx.globalAlpha = vivant ? 1 : 0.35;
-      ctx.fillStyle = SKIN;
-      const pad = i === 0 ? 1 : 2;
-      ctx.fillRect(seg[0] * cw + pad, seg[1] * ch + pad, cw - pad * 2, ch - pad * 2);
-      if (i === 0 && bouclier) {
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(seg[0] * cw + 1, seg[1] * ch + 1, cw - 2, ch - 2);
-      }
-    });
-    ctx.globalAlpha = 1;
-  }
-
-  const map = {
-    ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
-    w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
-    W: [0, -1], S: [0, 1], A: [-1, 0], D: [1, 0],
-  };
+  // Contrôles (clavier, glisser, boutons) + pause avec Espace ou P
+  Controles.brancher(canvas, changerDirection);
   window.addEventListener("keydown", function (ev) {
-    const d = map[ev.key];
-    if (!d) return;
-    if (d[0] === -dir[0] && d[1] === -dir[1]) return;
-    ev.preventDefault();
-    nextDir = d;
+    if ((ev.key === " " || ev.key === "p" || ev.key === "P") && vivant) {
+      ev.preventDefault();
+      enPause = !enPause;
+      dessiner();
+    }
   });
 
-  if (btn) btn.addEventListener("click", reset);
-  if (again) again.addEventListener("click", reset);
+  btnRestart.addEventListener("click", reset);
+  btnAgain.addEventListener("click", reset);
   reset();
 })();

@@ -1,32 +1,24 @@
+{# classement.html — Tableau calculé en SQL (database.classement). #}
 {% extends "base.html" %}
-{% block title %}Classement — Serpentix{% endblock %}
+{% block title %}Classement · Serpentix{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
     <h1>Classement</h1>
-    <p>Victoires, scores et coins — données réelles depuis SQLite.</p>
+    <p>Victoires, scores et coins des parties 1v1 terminées, lus dans la base SQLite.</p>
   </div>
 </div>
 {% if classement %}
+<div class="table-wrap">
 <table class="table">
   <thead>
-    <tr>
-      <th>#</th>
-      <th>Joueur</th>
-      <th>Victoires</th>
-      <th>Score</th>
-      <th>Parties</th>
-      <th>Coins</th>
-    </tr>
+    <tr><th>#</th><th>Joueur</th><th>Victoires</th><th>Score</th><th>Parties</th><th>Coins</th></tr>
   </thead>
   <tbody>
   {% for j in classement %}
     <tr>
       <td class="rank">{{ loop.index }}</td>
-      <td>
-        <span class="swatch" style="background:{{ j.couleur_skin }}"></span>
-        {{ j.pseudo }}
-      </td>
+      <td><span class="swatch" style="background:{{ j.couleur_skin }}"></span> {{ j.pseudo }}</td>
       <td>{{ j.victoires }}</td>
       <td>{{ j.score_total }}</td>
       <td>{{ j.parties_jouees }}</td>
@@ -35,6 +27,7 @@
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
 <p class="muted">Personne au classement pour l’instant.</p>
 {% endif %}

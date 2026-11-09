@@ -1,5 +1,6 @@
+{# boutique.html — Grille des skins : acheter (débit de coins) ou équiper. #}
 {% extends "base.html" %}
-{% block title %}Boutique — Serpentix{% endblock %}
+{% block title %}Boutique · Serpentix{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
@@ -10,14 +11,16 @@
 </div>
 
 <div class="shop-grid">
+  {# skins = dictionnaire database.SKINS ; sid = identifiant (« rouge »…) #}
   {% for sid, skin in skins.items() %}
     {% set possede = sid in user.skins_liste %}
     {% set est_equipe = sid == equipe %}
     <article class="skin-card {% if possede %}owned{% endif %} {% if est_equipe %}equipped{% endif %}">
+      <!-- Aperçu : trois carrés de la couleur du skin -->
       <div class="skin-preview" aria-hidden="true">
         <span style="background:{{ skin.hex }}"></span>
-        <span style="background:{{ skin.hex }}; opacity:0.85"></span>
-        <span style="background:{{ skin.hex }}; opacity:0.7"></span>
+        <span style="background:{{ skin.hex }}"></span>
+        <span style="background:{{ skin.hex }}"></span>
       </div>
       <strong>{{ skin.nom }}</strong>
       {% if est_equipe %}
@@ -30,7 +33,9 @@
         <span class="price">◈ {{ skin.prix }}</span>
       {% endif %}
 
+      {# Un petit formulaire POST par skin ; le serveur revérifie tout #}
       <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="skin_id" value="{{ sid }}">
         {% if est_equipe %}
           <button class="btn btn-sm" type="button" disabled>Équipé</button>

@@ -1,9 +1,11 @@
+{# utilisateur_nouveau.html — CREATE (exigence NSI) : ajouter un joueur depuis la gestion. #}
 {% extends "base.html" %}
-{% block title %}Nouveau joueur — Serpentix{% endblock %}
+{% block title %}Nouveau joueur · Serpentix{% endblock %}
 {% block content %}
 <h1>Créer un joueur</h1>
-<p class="muted">Formulaire CREATE (exigence NSI). Skin blanc gratuit par défaut.</p>
+<p class="muted">Formulaire d’ajout dans la base. Skin blanc gratuit et 0 coin au départ.</p>
 <form class="form" method="post" id="form-nouveau" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="field">
     <label for="pseudo">Pseudo</label>
     <input type="text" id="pseudo" name="pseudo" value="{{ valeurs.pseudo }}"
@@ -12,12 +14,12 @@
   </div>
   <div class="field">
     <label for="email">E-mail</label>
-    <input type="email" id="email" name="email" value="{{ valeurs.email }}" required>
+    <input type="email" id="email" name="email" value="{{ valeurs.email }}" required maxlength="100">
     <span class="err" data-for="email">{{ erreurs.get('email', '') }}</span>
   </div>
   <div class="field">
     <label for="mot_de_passe">Mot de passe</label>
-    <input type="password" id="mot_de_passe" name="mot_de_passe" minlength="6" required>
+    <input type="password" id="mot_de_passe" name="mot_de_passe" minlength="6" maxlength="100" required>
     <span class="err" data-for="mot_de_passe">{{ erreurs.get('mot_de_passe', '') }}</span>
   </div>
   <button type="submit" class="btn btn-primary">Créer</button>
@@ -26,5 +28,4 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/validation.js') }}"></script>
-<script>initValidationNouveau();</script>
 {% endblock %}

@@ -1,24 +1,27 @@
+{# connexion.html — Formulaire de connexion (validation JS + Python). #}
 {% extends "base.html" %}
-{% block title %}Connexion — Serpentix{% endblock %}
+{% block title %}Connexion · Serpentix{% endblock %}
 {% block content %}
 <div class="auth-box">
   <h1>Connexion</h1>
   <p class="sub">Entre ton pseudo pour rejoindre l’arène.</p>
-  {% if erreur %}<p class="err" style="text-align:center;margin-bottom:1rem">{{ erreur }}</p>{% endif %}
-  <form class="form" method="post" id="form-connexion" novalidate style="max-width:100%">
+  {% if erreur %}<p class="err center">{{ erreur }}</p>{% endif %}
+  {# novalidate : on laisse validation.js afficher nos propres messages #}
+  <form class="form full" method="post" id="form-connexion" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="field">
       <label for="pseudo">Pseudo</label>
       <input type="text" id="pseudo" name="pseudo" value="{{ pseudo }}" required minlength="3" maxlength="20" autocomplete="username">
+      <span class="err" data-for="pseudo"></span>
     </div>
     <div class="field">
       <label for="mot_de_passe">Mot de passe</label>
-      <input type="password" id="mot_de_passe" name="mot_de_passe" required minlength="6" autocomplete="current-password">
+      <input type="password" id="mot_de_passe" name="mot_de_passe" required maxlength="100" autocomplete="current-password">
+      <span class="err" data-for="mot_de_passe"></span>
     </div>
-    <button type="submit" class="btn btn-primary btn-xl" style="width:100%">Jouer</button>
+    <button type="submit" class="btn btn-primary btn-xl btn-block">Jouer</button>
   </form>
-  <p class="muted" style="text-align:center;margin-top:1.25rem">
-    Pas encore de compte ? <a href="{{ url_for('inscription') }}">S’inscrire</a>
-  </p>
+  <p class="muted center mt">Pas encore de compte ? <a href="{{ url_for('inscription') }}">S’inscrire</a></p>
 </div>
 {% endblock %}
 {% block scripts %}

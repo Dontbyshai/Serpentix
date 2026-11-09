@@ -1,5 +1,7 @@
 /**
- * lobby.js — Créer / rejoindre une salle (code partageable)
+ * lobby.js — Page « Jouer » : créer une salle ou rejoindre avec un code.
+ * Communique avec Flask par fetch() (requêtes HTTP en arrière-plan, sans
+ * recharger la page) vers /api/partie/creer et /api/partie/rejoindre.
  */
 (function () {
   const btnCreer = document.getElementById("btn-creer");
@@ -10,29 +12,32 @@
   const btnCopier = document.getElementById("btn-copier");
   const form = document.getElementById("form-rejoindre");
   const err = document.getElementById("rejoindre-err");
+  // Jeton anti-CSRF à joindre à chaque POST (vérifié par app.py)
+  const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+  const FORMAT_CODE = /^[A-Z0-9]{6}$/;      // même règle que code_valide() en Python
 
+  // --- Créer une salle -----------------------------------------------------
   if (btnCreer) {
     btnCreer.addEventListener("click", async function () {
-      btnCreer.disabled = true;
+      btnCreer.disabled = true;              // évite de créer 2 salles en double-cliquant
       msg.textContent = "Création…";
       try {
-        const res = await fetch("/api/partie/creer", { method: "POST" });
+        const res = await fetch("/api/partie/creer", {
+          method: "POST",
+          headers: { "X-CSRF-Token": CSRF },
+        });
         const data = await res.json();
         if (!data.ok) {
           msg.textContent = data.erreur || "Erreur";
           btnCreer.disabled = false;
           return;
         }
-        // Affiche le code pour le partager avant d'entrer
-        if (zone && codeEl && lien) {
-          codeEl.textContent = data.code;
-          lien.href = "/partie/" + data.code;
-          zone.hidden = false;
-          msg.textContent = "Envoie ce code à ton adversaire, puis entre dans la salle.";
-          btnCreer.style.display = "none";
-        } else {
-          window.location.href = "/partie/" + data.code;
-        }
+        // On montre le code à partager avant d'entrer dans la salle
+        codeEl.textContent = data.code;
+        lien.href = "/partie/" + data.code;
+        zone.hidden = false;
+        msg.textContent = "Envoie ce code à ton adversaire, puis entre dans la salle.";
+        btnCreer.hidden = true;
       } catch (e) {
         msg.textContent = "Erreur réseau.";
         btnCreer.disabled = false;
@@ -40,32 +45,37 @@
     });
   }
 
-  if (btnCopier && codeEl) {
+  // --- Copier le code dans le presse-papiers --------------------------------
+  if (btnCopier) {
     btnCopier.addEventListener("click", async function () {
-      const t = codeEl.textContent || "";
       try {
-        await navigator.clipboard.writeText(t);
+        await navigator.clipboard.writeText(codeEl.textContent || "");
         btnCopier.textContent = "Copié !";
         setTimeout(function () { btnCopier.textContent = "Copier"; }, 1500);
       } catch (e) {
-        btnCopier.textContent = t;
+        btnCopier.textContent = "Copie impossible";   // ex. site en http sur mobile
       }
     });
   }
 
+  // --- Rejoindre avec un code (validation client puis serveur) ------------
   if (form) {
+    form.code.addEventListener("input", function () {
+      // Saisie confortable : majuscules automatiques, caractères interdits retirés
+      form.code.value = form.code.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    });
     form.addEventListener("submit", async function (ev) {
-      ev.preventDefault();
+      ev.preventDefault();                   // on gère l'envoi nous-mêmes
       err.textContent = "";
       const code = (form.code.value || "").trim().toUpperCase();
-      if (!code || code.length < 4) {
-        err.textContent = "Code invalide.";
+      if (!FORMAT_CODE.test(code)) {
+        err.textContent = "Le code fait 6 lettres ou chiffres.";
         return;
       }
       try {
         const res = await fetch("/api/partie/rejoindre", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
           body: JSON.stringify({ code: code }),
         });
         const data = await res.json();

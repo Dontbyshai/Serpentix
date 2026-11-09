@@ -1,22 +1,35 @@
 /**
- * game.js — Client du jeu 1v1 (canvas + Socket.IO)
- * Plateau noir & blanc ; seules les couleurs de skins colorent les serpents.
+ * game.js — Client du duel 1v1 (canvas + Socket.IO).
+ *
+ * Le navigateur ne calcule RIEN des règles : il envoie seulement les touches
+ * au serveur (événement « direction ») et redessine l'état reçu 10 fois par
+ * seconde (événement « etat_jeu »). C'est le modèle « serveur autoritaire » :
+ * impossible de tricher en modifiant ce fichier.
+ *
+ * Événements Socket.IO utilisés :
+ *   envoyés : rejoindre_salle {code}, direction {code, dx, dy}, quitter_salle {code}
+ *   reçus   : etat_jeu {...}, partie_lancee {code}, erreur {message}
  */
 (function () {
   const canvas = document.getElementById("game");
   if (!canvas) return;
-  const ctx = canvas.getContext("2d");
   const statusEl = document.getElementById("game-status");
   const scoresEl = document.getElementById("scores");
   const overlay = document.getElementById("fin-overlay");
   const finMsg = document.getElementById("fin-msg");
-  const code = window.SERPENTIX_CODE;
+  const code = window.SERPENTIX_CODE;      // code de la salle (injecté par le template)
+  const MOI = window.SERPENTIX_MOI;        // id de l'utilisateur connecté
 
+  // Connexion temps réel : WebSocket si possible, sinon « long polling »
   const socket = io({ transports: ["websocket", "polling"] });
 
   socket.on("connect", function () {
-    statusEl.textContent = "Connecté — salle " + code;
+    statusEl.textContent = "Connecté · salle " + code;
     socket.emit("rejoindre_salle", { code: code });
+  });
+
+  socket.on("disconnect", function () {
+    statusEl.textContent = "Connexion perdue… reconnexion";
   });
 
   socket.on("erreur", function (data) {
@@ -24,126 +37,60 @@
   });
 
   socket.on("partie_lancee", function () {
-    statusEl.textContent = "Partie en cours !";
+    statusEl.textContent = "C'est parti !";
   });
 
-  socket.on("etat_jeu", function (data) {
-    if (data.statut === "attente") {
-      statusEl.textContent = "En attente… (" + data.nb_joueurs + "/2) — partage le code " + data.code;
-    } else if (data.statut === "en_cours") {
-      statusEl.textContent = "En cours";
-    } else if (data.statut === "terminee") {
+  /** Reçu 10 fois par seconde : on met à jour le texte, les scores et le dessin. */
+  socket.on("etat_jeu", function (etat) {
+    if (etat.statut === "attente") {
+      statusEl.textContent = "En attente d'un adversaire (" + etat.nb_joueurs + "/2) · envoie le code " + etat.code;
+    } else if (etat.statut === "en_cours") {
+      statusEl.textContent = etat.decompte > 0 ? "Départ dans " + etat.decompte + "…" : "En cours";
+    } else if (etat.statut === "terminee") {
       statusEl.textContent = "Terminée";
-      finMsg.textContent = data.message_fin || "Fin de partie";
+      finMsg.textContent = etat.message_fin || "Fin de partie";
       overlay.classList.remove("hidden");
     }
-    renderScores(data);
-    dessiner(data);
+    afficherScores(etat);
+    Dessin.plateau(canvas, etat);
+    if (etat.statut === "en_cours" && etat.decompte > 0) {
+      Dessin.texteCentre(canvas, String(etat.decompte));
+    } else if (etat.statut === "attente") {
+      Dessin.texteCentre(canvas, etat.code);
+    }
   });
 
-  function renderScores(data) {
-    if (!scoresEl) return;
-    scoresEl.innerHTML = "";
-    (data.serpents || []).forEach(function (s) {
+  /**
+   * Affiche une « pastille » par joueur : couleur, pseudo, score, bonus.
+   * On construit les éléments avec textContent (jamais innerHTML avec des
+   * données reçues) : un pseudo piégé ne pourrait pas injecter du HTML (XSS).
+   * @param {Object} etat - état reçu du serveur
+   */
+  function afficherScores(etat) {
+    scoresEl.textContent = "";
+    (etat.serpents || []).forEach(function (s) {
       const pill = document.createElement("div");
       pill.className = "score-pill";
-      pill.innerHTML =
-        '<span class="swatch" style="background:' + s.couleur + '"></span>' +
-        "<strong>" + s.pseudo + "</strong> " + s.score +
-        (s.bouclier ? " ○" : "") +
-        (s.turbo ? " △" : "") +
-        (s.vivant ? "" : " ×");
+      const swatch = document.createElement("span");
+      swatch.className = "swatch";
+      swatch.style.background = s.couleur;
+      const nom = document.createElement("strong");
+      nom.textContent = s.pseudo + (s.joueur_id === MOI ? " (toi)" : "");
+      pill.appendChild(swatch);
+      pill.appendChild(nom);
+      pill.appendChild(document.createTextNode(
+        " " + s.score + (s.bouclier ? " ○" : "") + (s.turbo ? " △" : "") + (s.vivant ? "" : " ×")
+      ));
       scoresEl.appendChild(pill);
     });
   }
 
-  function dessiner(data) {
-    const W = canvas.width;
-    const H = canvas.height;
-    const cw = W / data.largeur;
-    const ch = H / data.hauteur;
-
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, W, H);
-    for (let y = 0; y < data.hauteur; y++) {
-      for (let x = 0; x < data.largeur; x++) {
-        if ((x + y) % 2 === 0) {
-          ctx.fillStyle = "#0a0a0a";
-          ctx.fillRect(x * cw, y * ch, cw, ch);
-        }
-      }
-    }
-
-    (data.pommes || []).forEach(function (p) {
-      const x = p[0] * cw + cw / 2;
-      const y = p[1] * ch + ch / 2;
-      ctx.beginPath();
-      ctx.fillStyle = "#ffffff";
-      ctx.arc(x, y, Math.min(cw, ch) * 0.32, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    (data.bonus || []).forEach(function (b) {
-      const x = b.pos[0] * cw + cw / 2;
-      const y = b.pos[1] * ch + ch / 2;
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 2;
-      if (b.type === "turbo") {
-        ctx.beginPath();
-        ctx.moveTo(x, y - 7);
-        ctx.lineTo(x + 6, y + 6);
-        ctx.lineTo(x - 6, y + 6);
-        ctx.closePath();
-        ctx.stroke();
-      } else {
-        ctx.beginPath();
-        ctx.arc(x, y, 7, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    });
-
-    (data.serpents || []).forEach(function (s) {
-      const corps = s.corps || [];
-      corps.forEach(function (seg, i) {
-        const px = seg[0] * cw;
-        const py = seg[1] * ch;
-        ctx.fillStyle = s.couleur;
-        ctx.globalAlpha = s.vivant ? (i === 0 ? 1 : 0.85) : 0.3;
-        const pad = i === 0 ? 1 : 2;
-        roundRect(ctx, px + pad, py + pad, cw - pad * 2, ch - pad * 2, 4);
-        ctx.fill();
-        if (i === 0 && s.bouclier) {
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(px + 1, py + 1, cw - 2, ch - 2);
-        }
-      });
-      ctx.globalAlpha = 1;
-    });
-  }
-
-  function roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-  }
-
-  const dirs = {
-    ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
-    w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
-    W: [0, -1], S: [0, 1], A: [-1, 0], D: [1, 0],
-  };
-  window.addEventListener("keydown", function (ev) {
-    const d = dirs[ev.key];
-    if (!d) return;
-    ev.preventDefault();
-    socket.emit("direction", { code: code, dx: d[0], dy: d[1] });
+  // Chaque virage part tout de suite au serveur, qui le met dans une file
+  Controles.brancher(canvas, function (dx, dy) {
+    socket.emit("direction", { code: code, dx: dx, dy: dy });
   });
 
+  // Fermer l'onglet = quitter la salle (forfait si la partie a commencé)
   window.addEventListener("beforeunload", function () {
     socket.emit("quitter_salle", { code: code });
   });

@@ -1,32 +1,34 @@
+{# lobby.html — Hub « Jouer » : solo, créer une salle 1v1, rejoindre par code (lobby.js). #}
 {% extends "base.html" %}
-{% block title %}Jouer — Serpentix{% endblock %}
+{% block title %}Jouer · Serpentix{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
     <h1>Jouer</h1>
-    <p>Choisis ton mode. En 1v1, un code à 6 caractères suffit pour défier un ami.</p>
+    <p>Choisis ton mode. En 1v1, un code de 6 caractères suffit pour défier un ami.</p>
   </div>
   <a class="btn btn-ghost btn-sm" href="{{ url_for('boutique') }}">Changer de skin</a>
 </div>
 
-<div class="mode-grid" style="margin-bottom: 1.5rem;">
+<div class="mode-grid">
   <article class="mode-card">
     <h2>Solo</h2>
-    <p>Entraînement local. Chaque pomme mangée te rapporte des coins (plafonnés) pour la boutique.</p>
+    <p>Entraînement. Chaque pomme mangée rapporte 1 coin (80 max par partie) pour la boutique.</p>
     <a class="btn btn-primary" href="{{ url_for('solo') }}">Lancer le solo</a>
   </article>
   <article class="mode-card">
     <h2>1 contre 1</h2>
-    <p>Temps réel via Socket.IO. Crée une salle, envoie le code, ou rejoins avec le code reçu.</p>
-    <span class="hint">Scroll ↓ pour créer / rejoindre</span>
+    <p>Temps réel. Crée une salle et envoie le code, ou rejoins avec le code reçu. Victoire = score + 15 coins.</p>
+    <a class="btn btn-ghost" href="#salles">Créer / rejoindre ↓</a>
   </article>
 </div>
 
-<div class="lobby-grid">
+<div class="lobby-grid" id="salles">
+  <!-- Créer : appelle POST /api/partie/creer puis affiche le code -->
   <section class="card">
     <h2>Créer une salle</h2>
     <p class="muted">Tu seras le premier serpent. La partie démarre dès que l’autre joueur rejoint.</p>
-    <button id="btn-creer" class="btn btn-primary" style="margin-top:1rem">Générer un code</button>
+    <button id="btn-creer" class="btn btn-primary mt">Générer un code</button>
     <div id="creer-zone" class="code-share" hidden>
       <span class="big-code" id="creer-code"></span>
       <button type="button" class="btn btn-ghost btn-sm" id="btn-copier">Copier</button>
@@ -35,13 +37,14 @@
     <p id="creer-msg" class="hint"></p>
   </section>
 
+  <!-- Rejoindre : validation du format en JS, puis POST /api/partie/rejoindre -->
   <section class="card">
     <h2>Rejoindre avec un code</h2>
     <form id="form-rejoindre" class="form">
       <div class="field">
         <label for="code">Code de la salle</label>
-        <input type="text" id="code" name="code" maxlength="6" placeholder="ABC123"
-               style="text-transform:uppercase; letter-spacing:0.2em; font-family:var(--mono)" required>
+        <input type="text" id="code" name="code" minlength="6" maxlength="6" placeholder="ABC123"
+               pattern="[A-Za-z0-9]{6}" autocomplete="off" autocapitalize="characters" class="code-input" required>
         <span class="err" id="rejoindre-err"></span>
       </div>
       <button type="submit" class="btn btn-primary">Rejoindre</button>

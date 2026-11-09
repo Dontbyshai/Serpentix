@@ -1,197 +1,154 @@
 /**
- * bg-snake.js — Animation décorative (serpent qui joue en arrière-plan).
- * Non interactive. Noir & blanc uniquement.
+ * bg-snake.js — Animation décorative : un serpent qui « joue tout seul »
+ * derrière le site (sur la page d'accueil, la boutique, etc.).
+ *
+ * - Non interactif (pointer-events: none dans le CSS).
+ * - 100 % noir & blanc, SANS transparence : le corps est dessiné en simples
+ *   contours blancs (fin et discret) et la tête est pleine.
+ * - Pilotage automatique : à chaque pas, le serpent choisit parmi les directions
+ *   possibles celle qui le rapproche le plus de la pomme (algorithme glouton).
+ * - Désactivé sur les pages de jeu (classe no-bg-snake sur <body>).
  */
 (function () {
-  if (document.body.classList.contains("no-bg-snake")) {
-    const c = document.getElementById("bg-snake");
-    if (c) c.remove();
-    return;
-  }
   const canvas = document.getElementById("bg-snake");
   if (!canvas || !canvas.getContext) return;
+  if (document.body.classList.contains("no-bg-snake")) {
+    canvas.remove();                        // pages de jeu : pas de décor
+    return;
+  }
+  // Respecte le réglage « réduire les animations » du système (accessibilité)
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    canvas.remove();
+    return;
+  }
 
   const ctx = canvas.getContext("2d");
-  let w = 0, h = 0, cell = 22, cols = 0, rows = 0;
-  let snake = [];
+  const CELL = 22;           // taille d'une case en pixels
+  const STEP_MS = 110;       // un pas toutes les 110 ms
+  const TAILLE_MAX = 28;     // le serpent décoratif ne grandit pas au-delà
+  let w = 0, h = 0, cols = 0, rows = 0, ox = 0, oy = 0;
+  let snake = [];            // liste de {x, y}, tête = snake[0]
   let dir = { x: 1, y: 0 };
-  let nextDir = { x: 1, y: 0 };
   let apple = { x: 0, y: 0 };
-  let tick = 0;
   let last = 0;
-  const STEP_MS = 110;
 
+  /** Adapte la grille à la taille de la fenêtre. */
   function resize() {
     w = canvas.width = window.innerWidth;
     h = canvas.height = window.innerHeight;
-    cols = Math.max(20, Math.floor(w / cell));
-    rows = Math.max(14, Math.floor(h / cell));
-    // Recentrer la logique grille
-    if (!snake.length) reset();
-    else {
-      // garder la pomme dans les bornes
-      apple.x = apple.x % cols;
-      apple.y = apple.y % rows;
-      snake = snake.map((s) => ({ x: ((s.x % cols) + cols) % cols, y: ((s.y % rows) + rows) % rows }));
+    cols = Math.max(20, Math.floor(w / CELL));
+    rows = Math.max(14, Math.floor(h / CELL));
+    ox = (w - cols * CELL) / 2;  // marges pour centrer la grille
+    oy = (h - rows * CELL) / 2;
+    if (!snake.length) {
+      reset();
+    } else {
+      // On ramène tout dans la nouvelle grille (modulo = « wrap »)
+      apple.x %= cols;
+      apple.y %= rows;
+      snake = snake.map(function (s) { return { x: s.x % cols, y: s.y % rows }; });
     }
   }
 
+  /** Repart avec un petit serpent au centre. */
   function reset() {
     const cx = Math.floor(cols / 2);
     const cy = Math.floor(rows / 2);
-    snake = [
-      { x: cx, y: cy },
-      { x: cx - 1, y: cy },
-      { x: cx - 2, y: cy },
-      { x: cx - 3, y: cy },
-      { x: cx - 4, y: cy },
-    ];
+    snake = [];
+    for (let i = 0; i < 5; i++) snake.push({ x: cx - i, y: cy });
     dir = { x: 1, y: 0 };
-    nextDir = { x: 1, y: 0 };
     placeApple();
   }
 
+  /** Place la pomme sur une case libre au hasard. */
   function placeApple() {
-    let ok = false;
-    let tries = 0;
-    while (!ok && tries < 200) {
-      apple = {
-        x: Math.floor(Math.random() * cols),
-        y: Math.floor(Math.random() * rows),
-      };
-      ok = !snake.some((s) => s.x === apple.x && s.y === apple.y);
-      tries++;
+    for (let essais = 0; essais < 200; essais++) {
+      apple = { x: Math.floor(Math.random() * cols), y: Math.floor(Math.random() * rows) };
+      if (!snake.some(function (s) { return s.x === apple.x && s.y === apple.y; })) return;
     }
   }
 
-  function towardApple() {
+  /**
+   * Distance de Manhattan en tenant compte du « wrap » (les bords se
+   * rejoignent, comme dans un vieux Snake).
+   * @returns {number}
+   */
+  function wrapDist(ax, ay, bx, by) {
+    let dx = Math.abs(ax - bx);
+    let dy = Math.abs(ay - by);
+    dx = Math.min(dx, cols - dx);
+    dy = Math.min(dy, rows - dy);
+    return dx + dy;
+  }
+
+  /** Choisit la prochaine direction (glouton + un peu de hasard). */
+  function choisirDirection() {
     const head = snake[0];
-    const dx = apple.x - head.x;
-    const dy = apple.y - head.y;
-    // wrap-aware distance
     let best = null;
-    const candidates = [
-      { x: 1, y: 0 },
-      { x: -1, y: 0 },
-      { x: 0, y: 1 },
-      { x: 0, y: -1 },
-    ];
-    // ne pas faire demi-tour
-    const filtered = candidates.filter((c) => !(c.x === -dir.x && c.y === -dir.y));
-
-    function wrapDist(ax, ay, bx, by) {
-      let dx2 = Math.abs(ax - bx);
-      let dy2 = Math.abs(ay - by);
-      dx2 = Math.min(dx2, cols - dx2);
-      dy2 = Math.min(dy2, rows - dy2);
-      return dx2 + dy2;
-    }
-
     let bestScore = Infinity;
-    for (const c of filtered) {
+    [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }].forEach(function (c) {
+      if (c.x === -dir.x && c.y === -dir.y) return;           // pas de demi-tour
       const nx = (head.x + c.x + cols) % cols;
       const ny = (head.y + c.y + rows) % rows;
-      // éviter de se mordre immédiatement
-      if (snake.some((s, i) => i < snake.length - 1 && s.x === nx && s.y === ny)) continue;
-      let score = wrapDist(nx, ny, apple.x, apple.y);
-      // un peu d'aléa pour un mouvement plus vivant
-      score += Math.random() * 0.4;
-      if (score < bestScore) {
-        bestScore = score;
-        best = c;
-      }
-    }
-    if (best) nextDir = best;
-    else if (filtered.length) nextDir = filtered[Math.floor(Math.random() * filtered.length)];
+      if (snake.some(function (s, i) { return i < snake.length - 1 && s.x === nx && s.y === ny; })) return;
+      const score = wrapDist(nx, ny, apple.x, apple.y) + Math.random() * 0.4;
+      if (score < bestScore) { bestScore = score; best = c; }
+    });
+    if (best) dir = best;
   }
 
+  /** Avance d'une case (mange la pomme si besoin). */
   function step() {
-    towardApple();
-    dir = nextDir;
+    choisirDirection();
     const head = snake[0];
     const nx = (head.x + dir.x + cols) % cols;
     const ny = (head.y + dir.y + rows) % rows;
-
-    // collision corps → reset doux
-    if (snake.some((s) => s.x === nx && s.y === ny)) {
-      reset();
-      return;
-    }
-
+    if (snake.some(function (s) { return s.x === nx && s.y === ny; })) { reset(); return; }
     snake.unshift({ x: nx, y: ny });
     if (nx === apple.x && ny === apple.y) {
       placeApple();
-      if (snake.length > 28) {
-        // garder une taille raisonnable pour le décor
-        snake.pop();
-      }
+      if (snake.length > TAILLE_MAX) snake.pop();
     } else {
       snake.pop();
     }
   }
 
+  /** Dessine la frame : uniquement noir et blanc, aucune transparence. */
   function draw() {
-    ctx.clearRect(0, 0, w, h);
-    // Légère grille blanche très fine (traits 1px purs blancs, espacés)
-    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, w, h);
     ctx.strokeStyle = "#ffffff";
+    ctx.fillStyle = "#ffffff";
     ctx.lineWidth = 1;
-    const stepG = cell * 2;
+
+    // Pomme : petit cercle (contour)
     ctx.beginPath();
-    for (let x = 0; x < w; x += stepG) {
-      ctx.moveTo(x + 0.5, 0);
-      ctx.lineTo(x + 0.5, h);
-    }
-    for (let y = 0; y < h; y += stepG) {
-      ctx.moveTo(0, y + 0.5);
-      ctx.lineTo(w, y + 0.5);
-    }
+    ctx.arc(apple.x * CELL + ox + CELL / 2, apple.y * CELL + oy + CELL / 2, CELL * 0.25, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Pomme
-    ctx.globalAlpha = 0.45;
-    ctx.fillStyle = "#ffffff";
-    const ax = apple.x * cell + (w - cols * cell) / 2;
-    const ay = apple.y * cell + (h - rows * cell) / 2;
-    const ox = (w - cols * cell) / 2;
-    const oy = (h - rows * cell) / 2;
-    ctx.beginPath();
-    ctx.arc(
-      apple.x * cell + ox + cell / 2,
-      apple.y * cell + oy + cell / 2,
-      cell * 0.28,
-      0,
-      Math.PI * 2
-    );
-    ctx.fill();
-
-    // Serpent
-    for (let i = 0; i < snake.length; i++) {
-      const s = snake[i];
-      const t = i / Math.max(1, snake.length - 1);
-      ctx.globalAlpha = 0.22 + (1 - t) * 0.28; // tête plus visible
-      const pad = i === 0 ? 2 : 3;
-      const x = s.x * cell + ox + pad;
-      const y = s.y * cell + oy + pad;
-      const size = cell - pad * 2;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(x, y, size, size);
-    }
-    ctx.globalAlpha = 1;
+    // Serpent : tête pleine, corps en contours fins
+    snake.forEach(function (s, i) {
+      const x = s.x * CELL + ox + 4;
+      const y = s.y * CELL + oy + 4;
+      const size = CELL - 8;
+      if (i === 0) ctx.fillRect(x, y, size, size);
+      else ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
+    });
   }
 
+  /** Boucle d'animation : requestAnimationFrame ≈ 60 fois par seconde. */
   function loop(ts) {
     if (!last) last = ts;
     if (ts - last >= STEP_MS) {
       step();
       last = ts;
-      tick++;
+      draw();
     }
-    draw();
     requestAnimationFrame(loop);
   }
 
-  window.addEventListener("resize", resize);
+  window.addEventListener("resize", function () { resize(); draw(); });
   resize();
+  draw();
   requestAnimationFrame(loop);
 })();

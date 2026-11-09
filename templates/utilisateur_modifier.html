@@ -1,9 +1,11 @@
+{# utilisateur_modifier.html — UPDATE (exigence NSI) : pseudo, e-mail, mot de passe. #}
 {% extends "base.html" %}
-{% block title %}Modifier {{ user.pseudo }} — Serpentix{% endblock %}
+{% block title %}Modifier {{ user.pseudo }} · Serpentix{% endblock %}
 {% block content %}
 <h1>Modifier {{ user.pseudo }}</h1>
-<p class="muted">Formulaire UPDATE (exigence NSI). Les skins se gèrent dans la boutique.</p>
+<p class="muted">Formulaire de mise à jour. Les skins se gèrent dans la boutique.</p>
 <form class="form" method="post" id="form-modifier" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="field">
     <label for="pseudo">Pseudo</label>
     <input type="text" id="pseudo" name="pseudo" value="{{ user.pseudo }}"
@@ -12,12 +14,12 @@
   </div>
   <div class="field">
     <label for="email">E-mail</label>
-    <input type="email" id="email" name="email" value="{{ user.email }}" required>
+    <input type="email" id="email" name="email" value="{{ user.email }}" required maxlength="100">
     <span class="err" data-for="email">{{ erreurs.get('email', '') }}</span>
   </div>
   <div class="field">
     <label for="mot_de_passe">Nouveau mot de passe (laisser vide = inchangé)</label>
-    <input type="password" id="mot_de_passe" name="mot_de_passe" minlength="6" autocomplete="new-password">
+    <input type="password" id="mot_de_passe" name="mot_de_passe" minlength="6" maxlength="100" autocomplete="new-password">
     <span class="err" data-for="mot_de_passe">{{ erreurs.get('mot_de_passe', '') }}</span>
   </div>
   <button type="submit" class="btn btn-primary">Enregistrer</button>
@@ -26,5 +28,4 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/validation.js') }}"></script>
-<script>initValidationModifier();</script>
 {% endblock %}

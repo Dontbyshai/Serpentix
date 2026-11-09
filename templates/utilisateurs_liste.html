@@ -1,21 +1,22 @@
+{# utilisateurs_liste.html — READ collectif (exigence NSI) : tableau de tous les joueurs. #}
 {% extends "base.html" %}
-{% block title %}Gestion joueurs (NSI) — Serpentix{% endblock %}
+{% block title %}Gestion joueurs (NSI) · Serpentix{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
     <h1>Gestion joueurs</h1>
-    <p>CRUD scolaire (exigence NSI) — hors menu de jeu principal.</p>
+    <p>Créer, afficher, modifier et supprimer les joueurs enregistrés dans la base.</p>
   </div>
   <a class="btn btn-primary btn-sm" href="{{ url_for('nouvel_utilisateur') }}">+ Nouveau joueur</a>
 </div>
 
+<div class="table-wrap">
 <table class="table">
   <thead>
-    <tr>
-      <th>ID</th><th>Pseudo</th><th>E-mail</th><th>Skin</th><th>Coins</th><th>Inscription</th><th>Actions</th>
-    </tr>
+    <tr><th>ID</th><th>Pseudo</th><th>E-mail</th><th>Skin</th><th>Coins</th><th>Inscription</th><th>Actions</th></tr>
   </thead>
   <tbody>
+  {# Boucle Jinja : une ligne <tr> par utilisateur de la table #}
   {% for u in utilisateurs %}
     <tr>
       <td class="rank">{{ u.id }}</td>
@@ -27,12 +28,14 @@
       <td><code>{{ u.couleur_skin }}</code></td>
       <td>◈ {{ u.coins }}</td>
       <td>{{ u.date_inscription }}</td>
-      <td>
+      <td class="actions-cell">
         <a class="btn btn-ghost btn-sm" href="{{ url_for('detail_utilisateur', uid=u.id) }}">Voir</a>
         {% if current_user and current_user.id == u.id %}
           <a class="btn btn-ghost btn-sm" href="{{ url_for('modifier_utilisateur', uid=u.id) }}">Modifier</a>
+          {# Suppression en POST + confirmation JavaScript avant l'envoi #}
           <form method="post" action="{{ url_for('supprimer_utilisateur', uid=u.id) }}"
-                style="display:inline" onsubmit="return confirm('Supprimer {{ u.pseudo }} ?');">
+                class="inline" onsubmit="return confirm('Supprimer ton compte {{ u.pseudo }} ?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-ghost btn-sm">Supprimer</button>
           </form>
         {% endif %}
@@ -43,4 +46,6 @@
   {% endfor %}
   </tbody>
 </table>
+</div>
+<p class="hint">Pour des raisons de sécurité, chaque joueur ne peut modifier ou supprimer que son propre compte.</p>
 {% endblock %}
