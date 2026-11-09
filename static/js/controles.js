@@ -1,11 +1,15 @@
 /**
- * controles.js — Contrôles du serpent, PARTAGÉS par le solo et le 1v1.
+ * controles.js — Contrôles du serpent, PARTAGÉS par le solo et le multijoueur.
  *
  * Trois façons de diriger le serpent :
  *   1) clavier : flèches ou ZQSD / WASD ;
  *   2) glisser le doigt sur le plateau (téléphone, tablette) ;
  *   3) boutons fléchés à l'écran (élément .dpad, visible sur mobile).
  * Chaque action appelle la même fonction rappel(dx, dy).
+ *
+ * Ce fichier gère aussi le « verrou de défilement » : pendant une partie, la
+ * page ne doit JAMAIS bouger (molette, doigt, flèches, espace), sinon le
+ * plateau glisse hors de l'écran au mauvais moment.
  */
 const Controles = (function () {
   // Table de correspondance touche → vecteur [dx, dy] (y vers le bas)
@@ -30,6 +34,9 @@ const Controles = (function () {
       ev.preventDefault();               // empêche les flèches de faire défiler la page
       rappel(d[0], d[1]);
     });
+    // Pas de sélection de texte ni de « glisser l'image » sur le plateau
+    canvas.addEventListener("dragstart", function (ev) { ev.preventDefault(); });
+    canvas.addEventListener("selectstart", function (ev) { ev.preventDefault(); });
 
     // 2) Glisser le doigt : on compare le point de départ et d'arrivée
     let depart = null;
@@ -60,5 +67,48 @@ const Controles = (function () {
     });
   }
 
-  return { brancher: brancher };
+  // --- Verrou de défilement ----------------------------------------------
+  // Touches qui font défiler une page : flèches, espace, Page haut/bas…
+  // (+ ZQSD/WASD : on les bloque aussi pour éviter toute action du navigateur)
+  const TOUCHES_BLOQUEES = new Set([
+    "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Spacebar",
+    "PageUp", "PageDown", "Home", "End",
+    "z", "q", "s", "d", "w", "a", "Z", "Q", "S", "D", "W", "A",
+  ]);
+  let verrouActif = false;
+
+  /** Bloque une touche de défilement (sauf si on tape dans un champ de texte). */
+  function bloquerTouche(ev) {
+    const cible = ev.target;
+    if (cible && (cible.tagName === "INPUT" || cible.tagName === "TEXTAREA")) return;
+    if (TOUCHES_BLOQUEES.has(ev.key)) ev.preventDefault();
+  }
+  /** Annule l'action par défaut (défilement à la molette ou au doigt). */
+  function bloquer(ev) { ev.preventDefault(); }
+
+  /**
+   * Active le verrou : la page ne défile plus du tout.
+   * passive:false est OBLIGATOIRE pour wheel/touchmove : sinon le navigateur
+   * ignore preventDefault() (il défile sans attendre le script).
+   */
+  function verrouiller() {
+    if (verrouActif) return;
+    verrouActif = true;
+    document.documentElement.classList.add("jeu-verrouille");
+    window.addEventListener("keydown", bloquerTouche, { passive: false });
+    window.addEventListener("wheel", bloquer, { passive: false });
+    window.addEventListener("touchmove", bloquer, { passive: false });
+  }
+
+  /** Retire le verrou (écran de fin : on peut de nouveau défiler et cliquer). */
+  function deverrouiller() {
+    if (!verrouActif) return;
+    verrouActif = false;
+    document.documentElement.classList.remove("jeu-verrouille");
+    window.removeEventListener("keydown", bloquerTouche);
+    window.removeEventListener("wheel", bloquer);
+    window.removeEventListener("touchmove", bloquer);
+  }
+
+  return { brancher: brancher, verrouiller: verrouiller, deverrouiller: deverrouiller };
 })();

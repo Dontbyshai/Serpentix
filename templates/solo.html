@@ -1,48 +1,49 @@
 {# solo.html — Mode solo : la partie est calculée dans le navigateur (solo.js). #}
 {% extends "base.html" %}
 {% block title %}Solo · Serpentix{% endblock %}
-{% block body_class %}no-bg-snake{% endblock %}
+{# page-jeu : la page tient dans l'écran et ne défile pas (voir style.css) #}
+{% block body_class %}page-jeu{% endblock %}
 {% block content %}
 <div class="game-header">
   <h1>Mode solo</h1>
-  <p class="hud-stat">Score <strong id="solo-score">0</strong> · coins cette partie <span id="solo-gain">0</span></p>
+  <p class="hud-stat">Score <strong id="solo-score">0</strong> · coins <span id="solo-gain">0</span></p>
 </div>
 <div class="game-wrap">
   <!-- Plateau + flèches tactiles juste en dessous (pratique sur téléphone) -->
   <div class="board">
     <canvas id="solo-canvas" width="800" height="600" aria-label="Plateau solo"></canvas>
+    <div id="mes-effets" class="mes-effets" aria-live="polite"></div>
     {% include "_dpad.html" %}
   </div>
   <aside class="game-help">
     <h3>Contrôles</h3>
     <ul>
       <li>Flèches, <kbd>ZQSD</kbd> ou <kbd>WASD</kbd></li>
-      <li>Mobile : glisse le doigt ou utilise les flèches</li>
       <li><kbd>Espace</kbd> : pause</li>
       <li>Pomme = +1 case + 1 coin (80 max)</li>
-      <li>△ Turbo · ○ Bouclier</li>
     </ul>
+    <h3>Bonus</h3>
+    {% set solo = True %}
+    {% include "_legende.html" %}
     <button id="solo-restart" class="btn btn-primary btn-sm">Recommencer</button>
     <a class="btn btn-ghost btn-sm mt-sm" href="{{ url_for('jouer') }}">Retour</a>
   </aside>
 </div>
 
-<!-- Fenêtre Game Over (affichée par solo.js) -->
-<div id="fin-overlay" class="overlay hidden">
-  <div class="overlay-box">
-    <h2>Game Over</h2>
-    <p id="fin-msg" class="muted"></p>
-    <button id="solo-again" class="btn btn-primary">Rejouer</button>
-    <a class="btn btn-ghost" href="{{ url_for('boutique') }}">Boutique</a>
-  </div>
-</div>
+{% set boutons %}
+  <button id="solo-again" class="btn btn-primary">Rejouer</button>
+  <a class="btn btn-ghost" href="{{ url_for('boutique') }}">Boutique</a>
+{% endset %}
+{% include "_fin.html" %}
 {% endblock %}
 {% block scripts %}
 <script>
-  // Couleur du skin équipé, transmise par Flask
+  // Couleur du skin équipé et réglages du jeu, transmis par Flask
   window.SERPENTIX_SKIN = {{ couleur|tojson }};
+  window.SERPENTIX_REGLAGES = {{ reglages|tojson }};
 </script>
 <script src="{{ url_for('static', filename='js/dessin.js') }}"></script>
 <script src="{{ url_for('static', filename='js/controles.js') }}"></script>
+<script src="{{ url_for('static', filename='js/fin.js') }}"></script>
 <script src="{{ url_for('static', filename='js/solo.js') }}"></script>
 {% endblock %}

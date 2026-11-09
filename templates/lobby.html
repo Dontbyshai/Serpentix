@@ -1,34 +1,46 @@
-{# lobby.html — Hub « Jouer » : solo, créer une salle 1v1, rejoindre par code (lobby.js). #}
+{# lobby.html — Hub « Jouer » : solo, créer une salle de 2 ou 3 joueurs, rejoindre par code (lobby.js). #}
 {% extends "base.html" %}
 {% block title %}Jouer · Serpentix{% endblock %}
+{# avec-arene : l'arène animée (bg-snake.js) tourne derrière cette page #}
+{% block body_class %}avec-arene{% endblock %}
 {% block content %}
-<div class="page-head">
+<div class="page-head panneau">
   <div>
     <h1>Jouer</h1>
-    <p>Choisis ton mode. En 1v1, un code de 6 caractères suffit pour défier un ami.</p>
+    <p>Solo pour t'entraîner, ou une salle de 2 ou 3 joueurs : un code de 6 caractères suffit pour inviter tes amis.</p>
   </div>
   <a class="btn btn-ghost btn-sm" href="{{ url_for('boutique') }}">Changer de skin</a>
 </div>
 
 <div class="mode-grid">
   <article class="mode-card">
+    <span class="mode-num">01</span>
     <h2>Solo</h2>
     <p>Entraînement. Chaque pomme mangée rapporte 1 coin (80 max par partie) pour la boutique.</p>
     <a class="btn btn-primary" href="{{ url_for('solo') }}">Lancer le solo</a>
   </article>
   <article class="mode-card">
-    <h2>1 contre 1</h2>
-    <p>Temps réel. Crée une salle et envoie le code, ou rejoins avec le code reçu. Victoire = score + 15 coins.</p>
+    <span class="mode-num">02</span>
+    <h2>Multijoueur</h2>
+    <p>Temps réel à 2 ou 3. Le dernier serpent en vie gagne : son score + 15 coins.</p>
     <a class="btn btn-ghost" href="#salles">Créer / rejoindre ↓</a>
   </article>
 </div>
 
 <div class="lobby-grid" id="salles">
-  <!-- Créer : appelle POST /api/partie/creer puis affiche le code -->
+  <!-- Créer : appelle POST /api/partie/creer {nb_joueurs} puis affiche le code -->
   <section class="card">
     <h2>Créer une salle</h2>
-    <p class="muted">Tu seras le premier serpent. La partie démarre dès que l’autre joueur rejoint.</p>
-    <button id="btn-creer" class="btn btn-primary mt">Générer un code</button>
+    <form id="form-creer" class="form full">
+      <fieldset class="choix-joueurs">
+        <legend>Nombre de joueurs</legend>
+        <!-- Deux boutons radio : un seul choix possible (2 ou 3) -->
+        <label><input type="radio" name="nb_joueurs" value="2" checked><span>2 joueurs<small>duel</small></span></label>
+        <label><input type="radio" name="nb_joueurs" value="3"><span>3 joueurs<small>mêlée</small></span></label>
+      </fieldset>
+      <p class="hint">La partie démarre dès que la salle est pleine.</p>
+      <button id="btn-creer" type="submit" class="btn btn-primary">Générer un code</button>
+    </form>
     <div id="creer-zone" class="code-share" hidden>
       <span class="big-code" id="creer-code"></span>
       <button type="button" class="btn btn-ghost btn-sm" id="btn-copier">Copier</button>

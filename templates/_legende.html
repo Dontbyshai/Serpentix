@@ -1,0 +1,6 @@
+{# _legende.html — Liste des bonus avec leur pictogramme (dessiné par dessin.js). #}
+<ul class="legende">
+  {% for cle, (nom, description) in BONUS_INFOS.items() if (not solo or cle not in ("ciseaux", "gel")) %}
+    <li><span data-picto="{{ cle }}" aria-hidden="true"></span><span><strong>{{ nom }}</strong> · {{ description }}</span></li>
+  {% endfor %}
+</ul>

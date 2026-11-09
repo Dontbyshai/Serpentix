@@ -1,11 +1,12 @@
-{# partie.html — Salle 1v1 : canvas dessiné par game.js à partir de l'état envoyé par le serveur. #}
+{# partie.html — Salle multijoueur (2 ou 3) : canvas dessiné par game.js à partir de l'état envoyé par le serveur. #}
 {% extends "base.html" %}
 {% block title %}Partie {{ code }} · Serpentix{% endblock %}
-{% block body_class %}no-bg-snake{% endblock %}
+{# page-jeu : la page tient dans l'écran et ne défile pas (voir style.css) #}
+{% block body_class %}page-jeu{% endblock %}
 {% block content %}
 <div class="game-header">
   <h1>Salle <code id="room-code">{{ code }}</code></h1>
-  <p id="game-status" class="muted">Connexion…</p>
+  <p id="game-status" class="hud-status">Connexion…</p>
   <div id="scores" class="scores"></div>
 </div>
 
@@ -13,30 +14,31 @@
   <!-- Plateau + flèches tactiles juste en dessous (pratique sur téléphone) -->
   <div class="board">
     <canvas id="game" width="800" height="600" aria-label="Plateau de jeu Serpentix"></canvas>
+    <!-- Effets actifs de MON serpent, avec minuteur -->
+    <div id="mes-effets" class="mes-effets" aria-live="polite"></div>
     {% include "_dpad.html" %}
   </div>
   <aside class="game-help">
     <h3>Contrôles</h3>
     <ul>
       <li>Flèches, <kbd>ZQSD</kbd> ou <kbd>WASD</kbd></li>
-      <li>Mobile : glisse le doigt ou utilise les flèches</li>
-      <li>Pomme = grandir · △ Turbo · ○ Bouclier</li>
-      <li>Ta tête dans son corps = KO</li>
+      <li>Ta tête dans un corps = KO</li>
       <li>Tête contre tête : le plus long gagne</li>
+      <li>Dernier serpent en vie = victoire</li>
     </ul>
-    <p class="hint">Victoire : score + 15 coins bonus.</p>
+    <h3>Bonus</h3>
+    {% set solo = False %}
+    {% include "_legende.html" %}
+    <ul id="journal" class="journal" aria-live="polite"></ul>
     <a class="btn btn-ghost btn-sm" href="{{ url_for('jouer') }}">Quitter</a>
   </aside>
 </div>
 
-<!-- Fenêtre de fin de partie (affichée par game.js) -->
-<div id="fin-overlay" class="overlay hidden">
-  <div class="overlay-box">
-    <h2 id="fin-msg"></h2>
-    <a class="btn btn-primary" href="{{ url_for('jouer') }}">Nouvelle partie</a>
-    <a class="btn btn-ghost" href="{{ url_for('classement') }}">Classement</a>
-  </div>
-</div>
+{% set boutons %}
+  <a class="btn btn-primary" href="{{ url_for('jouer') }}">Nouvelle partie</a>
+  <a class="btn btn-ghost" href="{{ url_for('classement') }}">Classement</a>
+{% endset %}
+{% include "_fin.html" %}
 {% endblock %}
 {% block scripts %}
 <!-- Bibliothèque cliente Socket.IO (même version majeure que le serveur) -->
@@ -45,8 +47,11 @@
   // tojson : insère les valeurs Python de façon sûre dans du JavaScript
   window.SERPENTIX_CODE = {{ code|tojson }};
   window.SERPENTIX_MOI = {{ current_user.id|tojson }};
+  // Durée (en secondes) de chaque effet, pour les barres du HUD
+  window.SERPENTIX_DUREES = {{ durees|tojson }};
 </script>
 <script src="{{ url_for('static', filename='js/dessin.js') }}"></script>
 <script src="{{ url_for('static', filename='js/controles.js') }}"></script>
+<script src="{{ url_for('static', filename='js/fin.js') }}"></script>
 <script src="{{ url_for('static', filename='js/game.js') }}"></script>
 {% endblock %}

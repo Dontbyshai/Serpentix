@@ -1,0 +1,10 @@
+{# _fin.html — Écran de fin commun au solo et au multijoueur (animé par fin.js). #}
+<div id="fin-overlay" class="overlay hidden" role="dialog" aria-live="polite">
+  <!-- Canvas plein écran pour les particules (confettis, éclats) -->
+  <canvas id="fin-fx" aria-hidden="true"></canvas>
+  <div class="overlay-box">
+    <h2 id="fin-titre" class="fin-titre"></h2>
+    <p id="fin-msg"></p>
+    {{ boutons|safe if boutons }}
+  </div>
+</div>

@@ -1,33 +1,79 @@
-{# classement.html — Tableau calculé en SQL (database.classement). #}
+{# classement.html — Podium + tableau triable, calculés en SQL (database.classement). #}
 {% extends "base.html" %}
 {% block title %}Classement · Serpentix{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
     <h1>Classement</h1>
-    <p>Victoires, scores et coins des parties 1v1 terminées, lus dans la base SQLite.</p>
+    <p>Parties multijoueur terminées (2 ou 3 joueurs), calculées par une requête SQL sur la base.</p>
   </div>
+  {% if ma_ligne %}
+    <div class="coins-pill">Ta place <strong>#{{ ma_ligne.rang }}</strong></div>
+  {% endif %}
 </div>
+
+{# Onglets de tri : de simples liens ?tri=… (le serveur vérifie la valeur) #}
+{% set onglets = [("victoires", "Victoires"), ("ratio", "% victoires"), ("score", "Meilleur score"), ("coins", "Coins")] %}
+<nav class="tabs" aria-label="Trier le classement">
+  {% for cle, nom in onglets %}
+    <a href="{{ url_for('classement', tri=cle) }}" class="tab {% if tri == cle %}actif{% endif %}"
+       {% if tri == cle %}aria-current="page"{% endif %}>{{ nom }}</a>
+  {% endfor %}
+</nav>
+
 {% if classement %}
+{# Valeur mise en avant selon le tri choisi #}
+{% macro valeur(j) -%}
+  {%- if tri == "ratio" %}{{ j.ratio }} %{% elif tri == "score" %}{{ j.meilleur_score }} pts{% elif tri == "coins" %}◈ {{ j.coins }}{% else %}{{ j.victoires }} V{% endif -%}
+{%- endmacro %}
+
+<!-- Podium : 2e à gauche, 1er au centre (plus haut), 3e à droite -->
+<div class="podium">
+  {% for place in [1, 0, 2] if podium|length > place %}
+    {% set j = podium[place] %}
+    <div class="marche marche-{{ place + 1 }} {% if current_user and j.id == current_user.id %}moi{% endif %}">
+      <div class="marche-joueur">
+        <span class="swatch lg" style="background:{{ j.couleur_skin }}"></span>
+        <strong>{{ j.pseudo }}</strong>
+        <span class="marche-valeur">{{ valeur(j) }}</span>
+      </div>
+      <div class="marche-socle"><span>{{ place + 1 }}</span></div>
+    </div>
+  {% endfor %}
+</div>
+
 <div class="table-wrap">
-<table class="table">
+<table class="table classement">
   <thead>
-    <tr><th>#</th><th>Joueur</th><th>Victoires</th><th>Score</th><th>Parties</th><th>Coins</th></tr>
+    <tr>
+      <th>#</th><th>Joueur</th><th>Parties</th><th>V</th><th>N</th><th>D</th>
+      <th>% victoires</th><th>Meilleur score</th><th>Coins</th>
+    </tr>
   </thead>
   <tbody>
   {% for j in classement %}
-    <tr>
+    {# La ligne du joueur connecté est « inversée » (fond blanc, texte noir) #}
+    <tr class="{% if current_user and j.id == current_user.id %}moi{% endif %}">
       <td class="rank">{{ loop.index }}</td>
       <td><span class="swatch" style="background:{{ j.couleur_skin }}"></span> {{ j.pseudo }}</td>
-      <td>{{ j.victoires }}</td>
-      <td>{{ j.score_total }}</td>
       <td>{{ j.parties_jouees }}</td>
+      <td>{{ j.victoires }}</td>
+      <td>{{ j.nuls }}</td>
+      <td>{{ j.defaites }}</td>
+      <td>
+        <span class="ratio">
+          <span class="ratio-barre"><span style="width: {{ j.ratio }}%"></span></span>
+          {{ j.ratio }} %
+        </span>
+      </td>
+      <td>{{ j.meilleur_score }}</td>
       <td>◈ {{ j.coins }}</td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
 </div>
+<p class="hint mt">V = victoires · N = matchs nuls · D = défaites. Seules les parties terminées comptent.</p>
 {% else %}
 <p class="muted">Personne au classement pour l’instant.</p>
 {% endif %}

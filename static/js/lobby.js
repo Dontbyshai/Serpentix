@@ -1,9 +1,10 @@
 /**
- * lobby.js — Page « Jouer » : créer une salle ou rejoindre avec un code.
+ * lobby.js — Page « Jouer » : créer une salle (2 ou 3 joueurs) ou rejoindre avec un code.
  * Communique avec Flask par fetch() (requêtes HTTP en arrière-plan, sans
  * recharger la page) vers /api/partie/creer et /api/partie/rejoindre.
  */
 (function () {
+  const formCreer = document.getElementById("form-creer");
   const btnCreer = document.getElementById("btn-creer");
   const msg = document.getElementById("creer-msg");
   const zone = document.getElementById("creer-zone");
@@ -17,14 +18,23 @@
   const FORMAT_CODE = /^[A-Z0-9]{6}$/;      // même règle que code_valide() en Python
 
   // --- Créer une salle -----------------------------------------------------
-  if (btnCreer) {
-    btnCreer.addEventListener("click", async function () {
+  if (formCreer) {
+    formCreer.addEventListener("submit", async function (ev) {
+      ev.preventDefault();                   // on envoie nous-mêmes avec fetch()
+      // Validation CLIENT : on lit le bouton radio coché, seules 2 et 3 sont acceptées
+      const choix = formCreer.querySelector('input[name="nb_joueurs"]:checked');
+      const nb = choix ? parseInt(choix.value, 10) : 0;
+      if (nb !== 2 && nb !== 3) {
+        msg.textContent = "Choisis 2 ou 3 joueurs.";
+        return;
+      }
       btnCreer.disabled = true;              // évite de créer 2 salles en double-cliquant
       msg.textContent = "Création…";
       try {
         const res = await fetch("/api/partie/creer", {
           method: "POST",
-          headers: { "X-CSRF-Token": CSRF },
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
+          body: JSON.stringify({ nb_joueurs: nb }),
         });
         const data = await res.json();
         if (!data.ok) {
@@ -36,8 +46,10 @@
         codeEl.textContent = data.code;
         lien.href = "/partie/" + data.code;
         zone.hidden = false;
-        msg.textContent = "Envoie ce code à ton adversaire, puis entre dans la salle.";
-        btnCreer.hidden = true;
+        msg.textContent = data.nb_joueurs === 3
+          ? "Salle de 3 : envoie ce code à tes DEUX adversaires, puis entre dans la salle."
+          : "Duel : envoie ce code à ton adversaire, puis entre dans la salle.";
+        formCreer.hidden = true;
       } catch (e) {
         msg.textContent = "Erreur réseau.";
         btnCreer.disabled = false;

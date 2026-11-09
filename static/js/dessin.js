@@ -1,12 +1,13 @@
 /**
- * dessin.js — Fonctions de dessin du plateau, PARTAGÉES par le solo et le 1v1.
+ * dessin.js — Fonctions de dessin du plateau, PARTAGÉES par le solo et le multijoueur.
  *
- * Idée NSI « réutiliser du code » : le solo (solo.js) et le 1v1 (game.js)
- * appellent la même fonction Dessin.plateau(), donc le jeu a exactement le
- * même aspect dans les deux modes et on ne corrige un bug qu'une fois.
+ * Idée NSI « réutiliser du code » : le solo (solo.js) et les parties à 2 ou 3
+ * (game.js) appellent la même fonction Dessin.plateau(), donc le jeu a
+ * exactement le même aspect dans les deux modes et on ne corrige un bug qu'une fois.
  *
  * Contrainte de style : uniquement du noir (#000) et du blanc (#fff), aucune
  * transparence (qui donnerait du gris). Seuls les serpents ont une couleur.
+ * Les bonus sont des pictogrammes au trait blanc (pas d'emoji en couleur).
  */
 const Dessin = (function () {
   const NOIR = "#000000";
@@ -32,9 +33,91 @@ const Dessin = (function () {
   }
 
   /**
+   * Dessine le pictogramme d'un bonus, centré en (x, y), au trait blanc.
+   * Un dessin différent par type pour les reconnaître d'un coup d'œil :
+   *   turbo = triangle, bouclier = cercle, fantôme = carré en pointillés,
+   *   aimant = fer à cheval (U), ciseaux = croix à deux anneaux, gel = flocon.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {string} type - clé du bonus
+   * @param {number} x - centre (pixels)
+   * @param {number} y - centre (pixels)
+   * @param {number} r - « rayon » du pictogramme
+   */
+  function pictogramme(ctx, type, x, y, r) {
+    ctx.save();
+    ctx.strokeStyle = BLANC;
+    ctx.fillStyle = BLANC;
+    ctx.lineWidth = Math.max(1.5, r * 0.22);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    if (type === "turbo") {
+      ctx.moveTo(x, y - r);
+      ctx.lineTo(x + r, y + r * 0.85);
+      ctx.lineTo(x - r, y + r * 0.85);
+      ctx.closePath();
+      ctx.stroke();
+    } else if (type === "bouclier") {
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, r * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (type === "fantome") {
+      ctx.setLineDash([r * 0.35, r * 0.3]);
+      ctx.strokeRect(x - r, y - r, r * 2, r * 2);
+    } else if (type === "aimant") {
+      // Fer à cheval : demi-cercle en bas + deux branches vers le haut
+      ctx.arc(x, y, r * 0.75, 0, Math.PI);
+      ctx.moveTo(x - r * 0.75, y);
+      ctx.lineTo(x - r * 0.75, y - r);
+      ctx.moveTo(x + r * 0.75, y);
+      ctx.lineTo(x + r * 0.75, y - r);
+      ctx.stroke();
+    } else if (type === "ciseaux") {
+      // Deux lames croisées + deux anneaux
+      ctx.moveTo(x - r, y - r);
+      ctx.lineTo(x + r * 0.4, y + r * 0.25);
+      ctx.moveTo(x + r, y - r);
+      ctx.lineTo(x - r * 0.4, y + r * 0.25);
+      ctx.stroke();
+      [-1, 1].forEach(function (c) {
+        ctx.beginPath();
+        ctx.arc(x + c * r * 0.5, y + r * 0.6, r * 0.32, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+    } else if (type === "gel") {
+      // Flocon : 3 traits qui se croisent (6 branches)
+      for (let k = 0; k < 3; k++) {
+        const a = (k * Math.PI) / 3 + Math.PI / 2;
+        ctx.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+        ctx.lineTo(x - Math.cos(a) * r, y - Math.sin(a) * r);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Crée un petit <canvas> contenant le pictogramme d'un bonus.
+   * Utilisé par le HUD et la légende : même dessin que sur le plateau.
+   * @param {string} type
+   * @param {number} [taille=18] - côté en pixels
+   * @returns {HTMLCanvasElement}
+   */
+  function icone(type, taille) {
+    taille = taille || 18;
+    const c = document.createElement("canvas");
+    c.width = taille;
+    c.height = taille;
+    c.className = "picto";
+    pictogramme(c.getContext("2d"), type, taille / 2, taille / 2, taille * 0.36);
+    return c;
+  }
+
+  /**
    * Dessine un serpent case par case.
    * @param {CanvasRenderingContext2D} ctx
-   * @param {Object} s - serpent {corps: [[x,y],...], couleur, vivant, bouclier, turbo}
+   * @param {Object} s - serpent {corps, couleur, vivant, bouclier, fantome, gele}
    * @param {number} cw - largeur d'une case en pixels
    * @param {number} ch - hauteur d'une case en pixels
    */
@@ -45,26 +128,51 @@ const Dessin = (function () {
       const py = corps[i][1] * ch;
       const pad = i === 0 ? 1 : 2;                   // la tête est un peu plus grosse
       rectArrondi(ctx, px + pad, py + pad, cw - pad * 2, ch - pad * 2, 4);
-      if (s.vivant) {
-        ctx.fillStyle = s.couleur;
-        ctx.fill();
-      } else {
-        // Serpent éliminé : seulement le contour (pas de gris translucide)
+      if (!s.vivant) {
+        // Serpent éliminé : seulement un contour fin (pas de gris translucide)
         ctx.strokeStyle = s.couleur;
         ctx.lineWidth = 1;
         ctx.stroke();
+      } else if (s.fantome) {
+        // Fantôme : contour en pointillés de la couleur du skin (« intangible »)
+        ctx.save();
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = s.couleur;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.fillStyle = s.couleur;
+        ctx.fill();
+        if (s.gele && i % 2 === 0) {
+          // Gelé : un petit point noir sur une case sur deux (effet « givre »)
+          ctx.fillStyle = NOIR;
+          ctx.fillRect(px + cw / 2 - 1.5, py + ch / 2 - 1.5, 3, 3);
+        }
       }
     }
-    if (!corps.length || !s.vivant) return;
-
-    // Yeux noirs sur la tête, placés du côté où le serpent regarde
+    if (!corps.length) return;
     const tete = corps[0];
+    const cx = tete[0] * cw + cw / 2;
+    const cy = tete[1] * ch + ch / 2;
+    if (!s.vivant) {
+      // Croix sur la tête d'un serpent éliminé
+      ctx.strokeStyle = s.couleur;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - cw * 0.3, cy - ch * 0.3);
+      ctx.lineTo(cx + cw * 0.3, cy + ch * 0.3);
+      ctx.moveTo(cx + cw * 0.3, cy - ch * 0.3);
+      ctx.lineTo(cx - cw * 0.3, cy + ch * 0.3);
+      ctx.stroke();
+      return;
+    }
+
+    // Yeux sur la tête, placés du côté où le serpent regarde
     const cou = corps[1] || [tete[0] - 1, tete[1]];
     const dx = tete[0] - cou[0];
     const dy = tete[1] - cou[1];
-    const cx = tete[0] * cw + cw / 2;
-    const cy = tete[1] * ch + ch / 2;
-    ctx.fillStyle = NOIR;
+    ctx.fillStyle = s.fantome ? s.couleur : NOIR;
     [-1, 1].forEach(function (cote) {
       // perpendiculaire à la direction (-dy, dx) pour écarter les deux yeux
       const ex = cx + dx * cw * 0.18 + -dy * cote * cw * 0.2;
@@ -114,30 +222,20 @@ const Dessin = (function () {
       ctx.fill();
     });
 
-    // Bonus : triangle = turbo, cercle = bouclier (contours blancs)
+    // Bonus : pictogrammes blancs (voir pictogramme())
     (etat.bonus || []).forEach(function (b) {
-      const x = b.pos[0] * cw + cw / 2;
-      const y = b.pos[1] * ch + ch / 2;
-      const r = Math.min(cw, ch) * 0.38;
-      ctx.strokeStyle = BLANC;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      if (b.type === "turbo") {
-        ctx.moveTo(x, y - r);
-        ctx.lineTo(x + r, y + r);
-        ctx.lineTo(x - r, y + r);
-        ctx.closePath();
-      } else {
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-      }
-      ctx.stroke();
+      pictogramme(ctx, b.type, b.pos[0] * cw + cw / 2, b.pos[1] * ch + ch / 2,
+        Math.min(cw, ch) * 0.4);
     });
 
-    (etat.serpents || []).forEach(function (s) { serpent(ctx, s, cw, ch); });
+    // Les serpents éliminés d'abord (en dessous), les vivants par-dessus
+    const serpents = etat.serpents || [];
+    serpents.filter(function (s) { return !s.vivant; }).forEach(function (s) { serpent(ctx, s, cw, ch); });
+    serpents.filter(function (s) { return s.vivant; }).forEach(function (s) { serpent(ctx, s, cw, ch); });
   }
 
   /**
-   * Affiche un grand texte centré (compte à rebours, « GO », pause…).
+   * Affiche un grand texte centré (compte à rebours, code de salle, pause…).
    * @param {HTMLCanvasElement} canvas
    * @param {string} texte
    */
@@ -158,6 +256,44 @@ const Dessin = (function () {
     ctx.fillText(texte, canvas.width / 2, canvas.height / 2 + 2);
   }
 
+  /**
+   * Remplit un élément HTML avec les effets actifs d'un serpent : pictogramme
+   * + secondes restantes + petite barre qui se vide. Construit avec
+   * createElement/textContent (jamais innerHTML) : aucune injection possible.
+   * @param {HTMLElement} el - conteneur à remplir
+   * @param {Object} s - serpent {effets: {turbo: 2.1, ...}, bouclier}
+   * @param {Object} durees - durée totale de chaque effet en secondes
+   */
+  function effetsHUD(el, s, durees) {
+    el.textContent = "";
+    const effets = Object.assign({}, s.effets || {});
+    if (s.bouclier) effets.bouclier = null;          // le bouclier n'a pas de minuteur
+    Object.keys(effets).forEach(function (nom) {
+      const puce = document.createElement("span");
+      puce.className = "effet";
+      puce.appendChild(icone(nom, 16));
+      const t = document.createElement("span");
+      t.textContent = effets[nom] === null ? "prêt" : effets[nom].toFixed(1) + " s";
+      puce.appendChild(t);
+      if (effets[nom] !== null && durees && durees[nom]) {
+        // Barre de progression : largeur proportionnelle au temps restant
+        const barre = document.createElement("span");
+        barre.className = "effet-barre";
+        const plein = document.createElement("span");
+        plein.style.width = Math.max(0, Math.min(100, (100 * effets[nom]) / durees[nom])) + "%";
+        barre.appendChild(plein);
+        puce.appendChild(barre);
+      }
+      el.appendChild(puce);
+    });
+  }
+
   // Seules ces fonctions sont « publiques » (module JavaScript simple)
-  return { plateau: plateau, texteCentre: texteCentre };
+  return { plateau: plateau, texteCentre: texteCentre, icone: icone, effetsHUD: effetsHUD };
 })();
+
+// Légendes des bonus dans les pages : <span data-picto="turbo"></span> reçoit
+// automatiquement le même pictogramme que sur le plateau.
+document.querySelectorAll("[data-picto]").forEach(function (el) {
+  el.appendChild(Dessin.icone(el.dataset.picto, 20));
+});

@@ -51,7 +51,7 @@ a { color: var(--fg); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 .site-header, .container, .site-footer, .flash-wrap, .landing,
-.page-head, .auth-box {
+.page-head, .auth-box, .card, .mode-card {
   position: relative;
   z-index: 1;
 }
@@ -209,19 +209,27 @@ a:hover { text-decoration: underline; }
   border-style: dashed;
 }
 
-/* ----- Landing ----- */
+/* ----- Accueil (landing) ----- */
+/* Mise en page : panneau d'accroche aligné à gauche, l'arène animée reste
+   visible à droite et autour. Tous les textes sont sur des panneaux NOIRS
+   PLEINS (.panneau) : lisibles quoi qu'il se passe derrière. */
 .landing {
-  min-height: calc(100vh - 160px);
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 3.25rem;
-  padding: 2.5rem 0 3rem;
+  gap: 1.25rem;
+  padding: 2rem 0 3rem;
 }
-.landing-hero {
-  text-align: center;
-  max-width: 760px;
-  margin: 0 auto;
+.panneau {
+  background: #000000;
+  border: 1px solid #ffffff;
+  border-radius: var(--radius);
+  position: relative;
+  z-index: 1;
+}
+.hero {
+  max-width: 620px;
+  padding: 2.5rem 2.25rem 2rem;
+  box-shadow: 10px 10px 0 #ffffff;     /* ombre « dure » blanche, style rétro moderne */
 }
 .eyebrow {
   font-family: var(--mono);
@@ -229,56 +237,74 @@ a:hover { text-decoration: underline; }
   letter-spacing: 0.28em;
   text-transform: uppercase;
   color: #ffffff;
-  margin-bottom: 1.35rem;
+  margin: 0 0 1.1rem;
 }
-.landing-hero h1 {
-  font-size: clamp(3.2rem, 10vw, 6rem);
-  line-height: 0.92;
-  letter-spacing: -0.045em;
-  margin: 0 0 1.35rem;
+.hero-titre {
+  font-size: clamp(2.8rem, 8vw, 5.4rem);
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+  margin: 0 0 1.2rem;
   font-weight: 700;
-  color: #ffffff;
 }
-.landing-hero .lead {
-  color: #ffffff;
-  font-size: clamp(1.05rem, 2.4vw, 1.28rem);
-  font-weight: 400;
-  max-width: 32rem;
-  margin: 0 auto 2.1rem;
+/* « TIX » en négatif : texte noir sur bloc blanc */
+.hero-x {
+  background: #ffffff;
+  color: #000000;
+  padding: 0 0.08em;
+  margin-left: 0.04em;
+}
+.hero .lead {
+  font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+  max-width: 30rem;
+  margin: 0 0 1.75rem;
   line-height: 1.55;
 }
 .landing-cta {
   display: flex;
   flex-wrap: wrap;
   gap: 0.85rem;
-  justify-content: center;
   align-items: center;
 }
+.hero-chiffres {
+  display: flex;
+  gap: 1.75rem;
+  margin: 2rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid #ffffff;
+}
+.hero-chiffres dt { font-family: var(--mono); font-size: 1.8rem; font-weight: 600; line-height: 1; }
+.hero-chiffres dd { margin: 0.3rem 0 0; font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; }
 .landing-features {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
+  margin-top: 2.5rem;
 }
 .feature {
   border: 1px solid #ffffff;
   border-radius: var(--radius);
   padding: 1.4rem 1.25rem;
   background: #000000;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+.feature:hover { transform: translate(-3px, -3px); box-shadow: 6px 6px 0 #ffffff; }
 .feature h3 {
   margin: 0 0 0.45rem;
   font-size: 1rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.feature p { margin: 0; color: #ffffff; font-size: 0.95rem; font-weight: 400; }
+.feature p { margin: 0; font-size: 0.95rem; }
 .feature .num {
   font-family: var(--mono);
-  color: #ffffff;
   font-size: 0.72rem;
   letter-spacing: 0.16em;
   margin-bottom: 0.75rem;
 }
+.bonus-panneau { padding: 1.4rem 1.5rem; }
+.bonus-panneau .legende { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem 1.5rem; }
 
 /* ----- Cards / typo ----- */
 h1, h2, h3 { letter-spacing: -0.02em; color: #ffffff; }
@@ -545,15 +571,6 @@ canvas#game {
 .nav a.btn-primary { color: #000000; }
 .nav a.btn-primary:hover { color: #ffffff; }
 
-/* Textes de l'accueil sur fond noir : le serpent décoratif passe DERRIÈRE
-   sans gêner la lecture (pas besoin de transparence) */
-.landing-hero .eyebrow, .landing-hero h1, .landing-hero .lead {
-  background: #000000;
-  width: fit-content;
-  margin-left: auto;
-  margin-right: auto;
-  padding: 0 0.5rem;
-}
 .board { min-width: 0; }
 
 /* ----- Utilitaires (petites classes réutilisables) ----- */
@@ -606,9 +623,209 @@ canvas#solo-canvas, canvas#game { touch-action: none; }
 /* ----- Responsive ----- */
 @media (max-width: 860px) {
   .landing-features, .cards, .lobby-grid, .mode-grid { grid-template-columns: 1fr; }
+  .bonus-panneau .legende { grid-template-columns: 1fr; }
+  .hero { padding: 1.75rem 1.25rem; box-shadow: 6px 6px 0 #ffffff; }
   .game-wrap { grid-template-columns: 1fr; }
   .nav-toggle { display: inline-block; }
   .nav { display: none; width: 100%; flex-direction: column; align-items: flex-start; }
   .nav.open { display: flex; margin-top: 0.75rem; }
   .site-header { flex-wrap: wrap; }
 }
+
+/* ============================================================
+   Ajouts : arène, pages de jeu sans défilement, écrans de fin,
+   bonus, salle 2/3 joueurs, classement
+   ============================================================ */
+
+/* Sur les pages avec arène, les blocs gardent un fond noir plein */
+.avec-arene .page-head.panneau { padding: 1.25rem 1.4rem; }
+.mode-num { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.16em; }
+
+/* ----- Pages de jeu : tout tient dans l'écran, rien ne défile ----- */
+body.page-jeu {
+  height: 100vh;
+  height: 100dvh;                /* hauteur réelle sur mobile (barre d'adresse) */
+  overflow: hidden;
+  overscroll-behavior: none;     /* pas d'effet « élastique » */
+}
+html.jeu-verrouille { overflow: hidden; overscroll-behavior: none; }
+.page-jeu .site-footer { display: none; }
+.page-jeu .container {
+  margin: 0.6rem auto 0;
+  width: min(1180px, 96%);
+}
+.page-jeu .game-header { margin-bottom: 0.6rem; }
+.page-jeu .game-wrap { grid-template-columns: minmax(0, 1fr) 250px; }
+.page-jeu .board { display: flex; flex-direction: column; align-items: center; }
+/* Le plateau garde ses proportions 4/3 et ne dépasse jamais la hauteur de l'écran */
+.page-jeu canvas#game,
+.page-jeu canvas#solo-canvas {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(100vh - 175px);
+  max-height: calc(100dvh - 175px);
+}
+.page-jeu .game-help {
+  max-height: calc(100vh - 140px);
+  overflow: hidden;
+  padding: 0.85rem;
+  font-size: 0.85rem;
+}
+.page-jeu .game-help ul { margin: 0.35rem 0 0.75rem; }
+/* Pas de sélection de texte ni de glisser-déposer sur le plateau */
+.page-jeu canvas, .page-jeu .board, .page-jeu .dpad {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+}
+.hud-status { margin: 0; font-family: var(--mono); font-size: 0.9rem; }
+.score-pill.moi { background: #ffffff; color: #000000; }
+.score-pill.moi .picto { filter: invert(1); }   /* pictos noirs sur la pastille blanche */
+.score-pill.mort { border-style: dashed; text-decoration: line-through; }
+.picto { display: inline-block; vertical-align: middle; }
+
+/* Effets actifs sous le plateau : pictogramme + secondes + barre */
+.mes-effets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-height: 30px;
+  margin-top: 0.5rem;
+  justify-content: center;
+}
+.effet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem 0.15rem 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+.effet-barre { width: 46px; height: 6px; border: 1px solid #ffffff; border-radius: 3px; overflow: hidden; }
+.effet-barre span { display: block; height: 100%; background: #ffffff; }
+
+/* Légende des bonus */
+.legende { list-style: none; padding: 0; margin: 0.4rem 0 0.9rem; display: flex; flex-direction: column; gap: 0.45rem; }
+.legende li { display: flex; gap: 0.55rem; align-items: flex-start; font-size: 0.82rem; line-height: 1.35; }
+.legende [data-picto] { flex: 0 0 20px; height: 20px; }
+.journal { list-style: none; padding: 0; margin: 0 0 0.75rem; font-family: var(--mono); font-size: 0.75rem; }
+.journal li { border-left: 2px solid #ffffff; padding-left: 0.4rem; margin-bottom: 0.25rem; }
+
+/* ----- Écrans de fin animés (fin.js) ----- */
+#fin-fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.overlay-box { position: relative; }
+.fin-titre {
+  font-size: clamp(2.4rem, 7vw, 4rem);
+  letter-spacing: 0.04em;
+  margin: 0 0 0.5rem;
+  line-height: 1;
+}
+/* Victoire : le titre grandit puis rebondit, la boîte a une ombre blanche */
+.fin-victoire .overlay-box { box-shadow: 0 0 0 4px #000000, 0 0 0 6px #ffffff; }
+.fin-victoire .fin-titre { animation: grandir 0.9s cubic-bezier(.2, 1.6, .4, 1) both; }
+@keyframes grandir {
+  0%   { transform: scale(0.1); letter-spacing: -0.2em; }
+  70%  { transform: scale(1.15); }
+  100% { transform: scale(1); letter-spacing: 0.04em; }
+}
+/* Défaite : le titre tombe d'en haut et tremble */
+.fin-defaite .fin-titre { animation: tomber 0.6s ease-in both, trembler 0.35s 0.6s linear 2; }
+@keyframes tomber {
+  from { transform: translateY(-80px); }
+  to   { transform: translateY(0); }
+}
+@keyframes trembler {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+/* Match nul : le titre clignote en négatif (noir/blanc), sans gris */
+.fin-nul .fin-titre { animation: negatif 0.5s steps(1) 4; padding: 0 0.2em; }
+@keyframes negatif {
+  0%   { background: #ffffff; color: #000000; }
+  50%  { background: #000000; color: #ffffff; }
+}
+.fin-victoire .overlay-box, .fin-defaite .overlay-box, .fin-nul .overlay-box {
+  animation: apparaitre 0.3s ease-out both;
+}
+@keyframes apparaitre { from { transform: translateY(20px); } to { transform: translateY(0); } }
+
+/* ----- Choix 2 ou 3 joueurs (boutons radio en « interrupteur ») ----- */
+.choix-joueurs { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.choix-joueurs legend {
+  font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600;
+  margin-bottom: 0.5rem; padding: 0;
+}
+.choix-joueurs label { cursor: pointer; }
+.choix-joueurs input { position: absolute; opacity: 0; width: 1px; height: 1px; } /* caché mais accessible au clavier */
+.choix-joueurs label span {
+  display: flex; flex-direction: column; align-items: center;
+  border: 1px solid #ffffff; border-radius: var(--radius-sm);
+  padding: 0.8rem; font-weight: 700; font-size: 1.1rem;
+}
+.choix-joueurs label small { font-weight: 400; font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.choix-joueurs input:checked + span { background: #ffffff; color: #000000; }
+.choix-joueurs input:focus-visible + span { outline: 2px solid #ffffff; outline-offset: 3px; }
+
+/* ----- Classement : onglets de tri, podium, ligne du joueur ----- */
+.tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
+.tab {
+  border: 1px solid #ffffff; border-radius: 999px; padding: 0.4rem 0.95rem;
+  font-size: 0.85rem; font-weight: 600; text-decoration: none !important;
+}
+.tab:hover, .tab.actif { background: #ffffff; color: #000000; }
+.podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.75rem;
+  max-width: 640px;
+  margin: 0 auto 2rem;
+}
+.marche { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; text-align: center; }
+.marche-joueur { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+.marche-valeur { font-family: var(--mono); font-size: 0.85rem; }
+.marche-socle {
+  width: 100%;
+  border: 1px solid #ffffff;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  display: flex; align-items: flex-start; justify-content: center;
+  font-family: var(--mono); font-size: 2rem; font-weight: 600; padding-top: 0.5rem;
+  animation: monter 0.6s ease-out both;
+  transform-origin: bottom;
+}
+.marche-1 .marche-socle { height: 150px; background: #ffffff; color: #000000; }
+.marche-2 .marche-socle { height: 110px; animation-delay: 0.15s; }
+.marche-3 .marche-socle { height: 80px; animation-delay: 0.3s; }
+@keyframes monter { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.marche.moi strong { text-decoration: underline; }
+.table.classement tr.moi td { background: #ffffff; color: #000000; font-weight: 700; }
+.table.classement tr.moi .ratio-barre { border-color: #000000; }
+.table.classement tr.moi .ratio-barre span { background: #000000; }
+.ratio { display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--mono); white-space: nowrap; }
+.ratio-barre { width: 60px; height: 8px; border: 1px solid #ffffff; border-radius: 4px; overflow: hidden; display: inline-block; }
+.ratio-barre span { display: block; height: 100%; background: #ffffff; }
+
+/* ----- Pages de jeu sur téléphone ----- */
+@media (max-width: 860px) {
+  .page-jeu .game-wrap { grid-template-columns: 1fr; }
+  .page-jeu .game-help { display: none; }        /* la place va au plateau */
+  .page-jeu canvas#game, .page-jeu canvas#solo-canvas {
+    max-height: calc(100vh - 330px);
+    max-height: calc(100dvh - 330px);
+  }
+  .page-jeu .game-header h1 { font-size: 1rem; }
+  .podium { gap: 0.4rem; }
+  .marche-1 .marche-socle { height: 110px; }
+  .marche-2 .marche-socle { height: 80px; }
+  .marche-3 .marche-socle { height: 60px; }
+}
+
+/* L'attribut HTML hidden doit toujours gagner (sinon display:flex l'annule) */
+[hidden] { display: none !important; }
+/* Pastille de couleur lisible sur un fond blanc (ligne / pastille du joueur connecté) */
+.moi .swatch { border-color: #000000; }
