@@ -2,7 +2,7 @@
 {% block title %}Partie {{ code }} — Serpentix{% endblock %}
 {% block content %}
 <div class="game-header">
-  <h1>Partie <code id="room-code">{{ code }}</code></h1>
+  <h1>Salle <code id="room-code">{{ code }}</code></h1>
   <p id="game-status" class="muted">Connexion…</p>
   <div id="scores" class="scores"></div>
 </div>
@@ -13,11 +13,12 @@
     <h3>Contrôles</h3>
     <ul>
       <li>↑ ↓ ← → ou <kbd>WASD</kbd></li>
-      <li>🍎 Pomme = +1 segment</li>
-      <li>⚡ Turbo = vitesse ×2</li>
-      <li>🛡️ Bouclier = 1 choc</li>
+      <li>Pomme = grandir</li>
+      <li>⚡ Turbo · 🛡️ Bouclier</li>
+      <li>Toucher le corps adverse = KO</li>
     </ul>
-    <a class="btn btn-ghost btn-sm" href="{{ url_for('jouer') }}">Retour lobby</a>
+    <p class="hint">Victoire : score + 15 coins bonus.</p>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('jouer') }}">Quitter</a>
   </aside>
 </div>
 <div id="fin-overlay" class="overlay hidden">

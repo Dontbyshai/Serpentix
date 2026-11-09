@@ -8,36 +8,31 @@
   {% block head %}{% endblock %}
 </head>
 <body>
-  <!-- Menu de navigation (exigence NSI) -->
+  <!-- Menu de navigation (exigence NSI) — UX jeu, pas panneau admin -->
   <header class="site-header">
     <a class="logo" href="{{ url_for('accueil') }}">
-      <span class="logo-mark">◆</span> Serpentix
+      <span class="logo-mark" aria-hidden="true"></span> Serpentix
     </a>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Ouvrir le menu">☰</button>
     <nav class="nav" id="main-nav" aria-label="Navigation principale">
       <a href="{{ url_for('accueil') }}">Accueil</a>
       <a href="{{ url_for('jouer') }}">Jouer</a>
-      <a href="{{ url_for('solo') }}">Solo</a>
+      <a href="{{ url_for('boutique') }}">Boutique</a>
       <a href="{{ url_for('classement') }}">Classement</a>
-      <a href="{{ url_for('liste_utilisateurs') }}">Joueurs</a>
       {% if current_user %}
-        <a href="{{ url_for('profil') }}">Profil</a>
-        {% if current_user.est_admin %}
-          <a href="{{ url_for('nouvel_utilisateur') }}">Admin+</a>
-        {% endif %}
+        <span class="nav-coins" title="Coins">◈ {{ current_user.coins }}</span>
         <a class="nav-user" href="{{ url_for('profil') }}">
           <span class="swatch" style="background:{{ current_user.couleur_skin }}"></span>
           {{ current_user.pseudo }}
         </a>
-        <a href="{{ url_for('deconnexion') }}">Déconnexion</a>
+        <a href="{{ url_for('deconnexion') }}">Quitter</a>
       {% else %}
         <a href="{{ url_for('connexion') }}">Connexion</a>
-        <a class="btn btn-sm" href="{{ url_for('inscription') }}">Inscription</a>
+        <a class="btn btn-sm btn-primary" href="{{ url_for('inscription') }}">S'inscrire</a>
       {% endif %}
     </nav>
-    <button class="nav-toggle" id="nav-toggle" aria-label="Ouvrir le menu">☰</button>
   </header>
 
-  <!-- Messages flash -->
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       <div class="flash-wrap">
@@ -48,12 +43,14 @@
     {% endif %}
   {% endwith %}
 
-  <main class="container">
+  <main class="container {% block container_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
 
   <footer class="site-footer">
-    <p>Serpentix — Projet NSI · Snake × Slither en 1 contre 1</p>
+    <p>Serpentix — Projet NSI · Snake × Slither</p>
+    <!-- Lien discret pour la démo CRUD scolaire (pas dans le menu jeu) -->
+    <p><a href="{{ url_for('liste_utilisateurs') }}">Gestion joueurs (NSI)</a></p>
   </footer>
 
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>

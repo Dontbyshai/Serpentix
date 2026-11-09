@@ -1,32 +1,53 @@
 {% extends "base.html" %}
 {% block title %}Jouer — Serpentix{% endblock %}
 {% block content %}
-<h1>Lobby 1 contre 1</h1>
-<p class="muted">Crée une salle et partage le code, ou rejoins une partie existante.</p>
+<div class="page-head">
+  <div>
+    <h1>Jouer</h1>
+    <p>Choisis ton mode. En 1v1, un code à 6 caractères suffit pour défier un ami.</p>
+  </div>
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('boutique') }}">Changer de skin</a>
+</div>
+
+<div class="mode-grid" style="margin-bottom: 1.5rem;">
+  <article class="mode-card">
+    <h2>Solo</h2>
+    <p>Entraînement local. Chaque pomme mangée te rapporte des coins (plafonnés) pour la boutique.</p>
+    <a class="btn btn-primary" href="{{ url_for('solo') }}">Lancer le solo</a>
+  </article>
+  <article class="mode-card">
+    <h2>1 contre 1</h2>
+    <p>Temps réel via Socket.IO. Crée une salle, envoie le code, ou rejoins avec le code reçu.</p>
+    <span class="hint">Scroll ↓ pour créer / rejoindre</span>
+  </article>
+</div>
 
 <div class="lobby-grid">
   <section class="card">
-    <h2>Créer une partie</h2>
-    <p>Tu seras le premier serpent. Attends qu’un ami rejoigne.</p>
-    <button id="btn-creer" class="btn btn-primary">Créer une salle</button>
+    <h2>Créer une salle</h2>
+    <p class="muted">Tu seras le premier serpent. La partie démarre dès que l’autre joueur rejoint.</p>
+    <button id="btn-creer" class="btn btn-primary" style="margin-top:1rem">Générer un code</button>
+    <div id="creer-zone" class="code-share" hidden>
+      <span class="big-code" id="creer-code"></span>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-copier">Copier</button>
+      <a class="btn btn-primary btn-sm" id="lien-partie" href="#">Entrer dans la salle</a>
+    </div>
     <p id="creer-msg" class="hint"></p>
   </section>
 
   <section class="card">
-    <h2>Rejoindre</h2>
+    <h2>Rejoindre avec un code</h2>
     <form id="form-rejoindre" class="form">
       <div class="field">
         <label for="code">Code de la salle</label>
         <input type="text" id="code" name="code" maxlength="6" placeholder="ABC123"
-               style="text-transform:uppercase" required>
+               style="text-transform:uppercase; letter-spacing:0.2em; font-family:var(--mono)" required>
         <span class="err" id="rejoindre-err"></span>
       </div>
       <button type="submit" class="btn btn-primary">Rejoindre</button>
     </form>
   </section>
 </div>
-
-<p class="muted">Astuce : ouvre deux onglets avec deux comptes pour tester le 1v1 sur la même machine.</p>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/lobby.js') }}"></script>

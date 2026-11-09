@@ -1,21 +1,35 @@
 {% extends "base.html" %}
 {% block title %}Solo — Serpentix{% endblock %}
 {% block content %}
-<h1>Entraînement solo</h1>
-<p class="muted">Mode local (sans adversaire) pour s’habituer aux contrôles. Score non enregistré.</p>
+<div class="game-header">
+  <h1>Mode solo</h1>
+  <p class="hud-stat">Score <strong id="solo-score">0</strong> · coins cette run <span id="solo-gain">0</span></p>
+</div>
 <div class="game-wrap">
-  <canvas id="solo-canvas" width="800" height="600"></canvas>
+  <canvas id="solo-canvas" width="800" height="600" aria-label="Plateau solo"></canvas>
   <aside class="game-help">
-    <p>Score : <strong id="solo-score">0</strong></p>
-    <button id="solo-restart" class="btn btn-primary btn-sm">Recommencer</button>
+    <h3>Contrôles</h3>
     <ul>
-      <li>Flèches / WASD</li>
-      <li>Murs mortels</li>
-      <li>Pommes + bonus</li>
+      <li>↑ ↓ ← → ou <kbd>WASD</kbd></li>
+      <li>Pomme = +1 segment + coin</li>
+      <li>⚡ Turbo · 🛡️ Bouclier</li>
     </ul>
+    <button id="solo-restart" class="btn btn-primary btn-sm">Recommencer</button>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('jouer') }}" style="margin-top:0.5rem">Retour</a>
   </aside>
+</div>
+<div id="fin-overlay" class="overlay hidden">
+  <div class="overlay-box">
+    <h2>Game Over</h2>
+    <p id="fin-msg" class="muted"></p>
+    <button id="solo-again" class="btn btn-primary">Rejouer</button>
+    <a class="btn btn-ghost" href="{{ url_for('boutique') }}">Boutique</a>
+  </div>
 </div>
 {% endblock %}
 {% block scripts %}
+<script>
+  window.SERPENTIX_SKIN = {{ couleur|tojson }};
+</script>
 <script src="{{ url_for('static', filename='js/solo.js') }}"></script>
 {% endblock %}

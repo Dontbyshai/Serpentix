@@ -1,24 +1,26 @@
 {% extends "base.html" %}
 {% block title %}Connexion — Serpentix{% endblock %}
 {% block content %}
-<h1>Connexion</h1>
-{% if erreur %}<div class="flash flash-danger">{{ erreur }}</div>{% endif %}
-<form id="form-connexion" class="form" method="post" novalidate>
-  <div class="field">
-    <label for="pseudo">Pseudo</label>
-    <input type="text" id="pseudo" name="pseudo" value="{{ pseudo }}" required autocomplete="username">
-    <span class="err" data-for="pseudo"></span>
-  </div>
-  <div class="field">
-    <label for="mot_de_passe">Mot de passe</label>
-    <input type="password" id="mot_de_passe" name="mot_de_passe" required autocomplete="current-password">
-    <span class="err" data-for="mot_de_passe"></span>
-  </div>
-  <button type="submit" class="btn btn-primary">Se connecter</button>
-</form>
-<p class="muted">Pas encore de compte ? <a href="{{ url_for('inscription') }}">Inscription</a></p>
+<div class="auth-box">
+  <h1>Connexion</h1>
+  <p class="sub">Entre ton pseudo pour rejoindre l’arène.</p>
+  {% if erreur %}<p class="err" style="text-align:center;margin-bottom:1rem">{{ erreur }}</p>{% endif %}
+  <form class="form" method="post" id="form-connexion" novalidate style="max-width:100%">
+    <div class="field">
+      <label for="pseudo">Pseudo</label>
+      <input type="text" id="pseudo" name="pseudo" value="{{ pseudo }}" required minlength="3" maxlength="20" autocomplete="username">
+    </div>
+    <div class="field">
+      <label for="mot_de_passe">Mot de passe</label>
+      <input type="password" id="mot_de_passe" name="mot_de_passe" required minlength="6" autocomplete="current-password">
+    </div>
+    <button type="submit" class="btn btn-primary btn-xl" style="width:100%">Jouer</button>
+  </form>
+  <p class="muted" style="text-align:center;margin-top:1.25rem">
+    Pas encore de compte ? <a href="{{ url_for('inscription') }}">S’inscrire</a>
+  </p>
+</div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/validation.js') }}"></script>
-<script>initValidationConnexion();</script>
 {% endblock %}

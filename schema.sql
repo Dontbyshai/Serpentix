@@ -9,8 +9,10 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
     pseudo TEXT NOT NULL UNIQUE,               -- nom affiché en jeu
     email TEXT NOT NULL UNIQUE,                -- adresse e-mail unique
     mot_de_passe_hash TEXT NOT NULL,          -- mot de passe haché (Werkzeug)
-    couleur_skin TEXT NOT NULL DEFAULT '#22c55e', -- couleur du serpent
-    est_admin INTEGER NOT NULL DEFAULT 0,     -- 1 = admin (CRUD utilisateurs)
+    couleur_skin TEXT NOT NULL DEFAULT '#ffffff', -- skin équipé (hex)
+    skins_debloques TEXT NOT NULL DEFAULT 'blanc', -- ids séparés par virgules
+    coins INTEGER NOT NULL DEFAULT 0,          -- monnaie gagnée en jouant
+    est_admin INTEGER NOT NULL DEFAULT 0,     -- conservé pour CRUD NSI (caché UI)
     date_inscription TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 

@@ -1,22 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Profil — Serpentix{% endblock %}
 {% block content %}
-<h1>Mon profil</h1>
+<div class="page-head">
+  <div>
+    <h1>{{ user.pseudo }}</h1>
+    <p>
+      <span class="swatch lg" style="background:{{ user.couleur_skin }}"></span>
+      · <span class="coins-pill" style="margin-left:0.4rem">◈ {{ user.coins }} coins</span>
+    </p>
+  </div>
+  <a class="btn btn-primary btn-sm" href="{{ url_for('boutique') }}">Boutique</a>
+</div>
+
 <form class="form" method="post" id="form-profil" novalidate>
   <div class="field">
     <label>Pseudo</label>
     <input type="text" value="{{ user.pseudo }}" disabled>
-    <p class="hint">Le pseudo se change dans la page Joueurs → Modifier.</p>
+    <p class="hint">Pour changer le pseudo : <a href="{{ url_for('modifier_utilisateur', uid=user.id) }}">page compte</a>.</p>
   </div>
   <div class="field">
     <label for="email">E-mail</label>
     <input type="email" id="email" name="email" value="{{ user.email }}" required>
     <span class="err" data-for="email">{{ erreurs.get('email', '') }}</span>
-  </div>
-  <div class="field">
-    <label for="couleur_skin">Couleur du skin</label>
-    <input type="color" id="couleur_skin" name="couleur_skin" value="{{ user.couleur_skin }}">
-    <span class="err" data-for="couleur_skin">{{ erreurs.get('couleur_skin', '') }}</span>
   </div>
   <div class="field">
     <label for="mot_de_passe">Nouveau mot de passe (optionnel)</label>
@@ -31,7 +36,7 @@
   <button type="submit" class="btn btn-primary">Enregistrer</button>
 </form>
 
-<h2>Historique récent</h2>
+<h2 style="margin-top:2.5rem">Historique récent</h2>
 {% if historique %}
 <table class="table">
   <thead><tr><th>Code</th><th>Date</th><th>Score</th><th>Résultat</th></tr></thead>
@@ -41,12 +46,15 @@
       <td><code>{{ h.code }}</code></td>
       <td>{{ h.date_creation }}</td>
       <td>{{ h.score }}</td>
-      <td>{% if h.a_gagne %}🏆 Victoire{% elif h.statut == 'terminee' %}Défaite{% else %}{{ h.statut }}{% endif %}</td>
+      <td>{% if h.a_gagne %}Victoire{% elif h.statut == 'terminee' %}Défaite{% else %}{{ h.statut }}{% endif %}</td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
 {% else %}
-<p class="muted">Aucune partie encore.</p>
+<p class="muted">Aucune partie encore — lance un 1v1 depuis Jouer.</p>
 {% endif %}
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/validation.js') }}"></script>
 {% endblock %}

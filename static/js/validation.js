@@ -33,7 +33,6 @@ function checkMdp(value, obligatoire) {
   return null;
 }
 
-/** Formulaire d'inscription */
 function initValidationInscription() {
   const form = document.getElementById("form-inscription");
   if (!form) return;
@@ -55,20 +54,36 @@ function initValidationInscription() {
   });
 }
 
-/** Formulaire de connexion */
 function initValidationConnexion() {
   const form = document.getElementById("form-connexion");
   if (!form) return;
   form.addEventListener("submit", function (ev) {
+    if (!form.pseudo.value.trim() || !form.mot_de_passe.value) {
+      ev.preventDefault();
+    }
+  });
+}
+
+function initValidationProfil() {
+  const form = document.getElementById("form-profil");
+  if (!form) return;
+  form.addEventListener("submit", function (ev) {
     clearErrs(form);
     let ok = true;
-    if (!form.pseudo.value.trim()) { setErr("pseudo", "Pseudo obligatoire."); ok = false; }
-    if (!form.mot_de_passe.value) { setErr("mot_de_passe", "Mot de passe obligatoire."); ok = false; }
+    let e = checkEmail(form.email.value);
+    if (e) { setErr("email", e); ok = false; }
+    if (form.mot_de_passe.value || form.mot_de_passe2.value) {
+      e = checkMdp(form.mot_de_passe.value, true);
+      if (e) { setErr("mot_de_passe", e); ok = false; }
+      if (form.mot_de_passe.value !== form.mot_de_passe2.value) {
+        setErr("mot_de_passe2", "Les mots de passe ne correspondent pas.");
+        ok = false;
+      }
+    }
     if (!ok) ev.preventDefault();
   });
 }
 
-/** Modifier utilisateur */
 function initValidationModifier() {
   const form = document.getElementById("form-modifier") || document.getElementById("form-nouveau");
   if (!form) return;
@@ -82,6 +97,9 @@ function initValidationModifier() {
     if (form.mot_de_passe && form.mot_de_passe.value) {
       e = checkMdp(form.mot_de_passe.value, true);
       if (e) { setErr("mot_de_passe", e); ok = false; }
+    } else if (form.id === "form-nouveau") {
+      e = checkMdp(form.mot_de_passe.value, true);
+      if (e) { setErr("mot_de_passe", e); ok = false; }
     }
     if (!ok) ev.preventDefault();
   });
@@ -90,3 +108,9 @@ function initValidationModifier() {
 function initValidationNouveau() {
   initValidationModifier();
 }
+
+document.addEventListener("DOMContentLoaded", function () {
+  initValidationInscription();
+  initValidationConnexion();
+  initValidationProfil();
+});

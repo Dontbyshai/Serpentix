@@ -1,53 +1,53 @@
 {% extends "base.html" %}
-{% block title %}Accueil — Serpentix{% endblock %}
+{% block title %}Serpentix — Affronte. Grandis. Domine.{% endblock %}
+{% block container_class %}wide{% endblock %}
 {% block content %}
-<section class="hero">
-  <div class="hero-text">
-    <h1>Serpentix</h1>
+<section class="landing">
+  <div class="landing-hero">
+    <p class="eyebrow">Jeu navigateur · 1 contre 1</p>
+    <h1>SERPENTIX</h1>
     <p class="lead">
-      Affronte un autre joueur en direct dans un mélange de
-      <strong>Snake</strong> et de <strong>Slither.io</strong> :
-      mange des pommes, grandis, et élimine l’adversaire en touchant son corps.
+      Mange des pommes, grandis, et élimine l’adversaire en touchant son corps.
+      Solo pour farmer des coins — ou envoie un code à un ami pour le 1v1.
     </p>
-    <div class="hero-actions">
+    <div class="landing-cta">
       {% if current_user %}
-        <a class="btn btn-primary" href="{{ url_for('jouer') }}">Lancer une partie</a>
-        <a class="btn btn-ghost" href="{{ url_for('solo') }}">S’entraîner en solo</a>
+        <a class="btn btn-primary btn-xl" href="{{ url_for('jouer') }}">Jouer</a>
+        <a class="btn btn-ghost" href="{{ url_for('boutique') }}">Boutique de skins</a>
       {% else %}
-        <a class="btn btn-primary" href="{{ url_for('inscription') }}">Créer un compte</a>
-        <a class="btn btn-ghost" href="{{ url_for('connexion') }}">Se connecter</a>
+        <a class="btn btn-primary btn-xl" href="{{ url_for('connexion') }}">Jouer</a>
+        <a class="btn btn-ghost" href="{{ url_for('inscription') }}">Créer un compte</a>
       {% endif %}
     </div>
   </div>
-  <div class="hero-art" aria-hidden="true">
-    <div class="snake-preview">
-      <span class="seg s1"></span><span class="seg s2"></span><span class="seg s3"></span>
-      <span class="seg s4"></span><span class="apple">🍎</span>
+
+  <div class="landing-visual" aria-hidden="true">
+    <div class="snake-banner">
+      <span class="seg head"></span>
+      <span class="seg"></span>
+      <span class="seg"></span>
+      <span class="seg"></span>
+      <span class="seg"></span>
+      <span class="apple"></span>
     </div>
   </div>
-</section>
 
-<section class="cards">
-  <article class="card">
-    <h2>1 contre 1</h2>
-    <p>Crée une salle, partage le code, et affronte un ami sur le même site en temps réel.</p>
-  </article>
-  <article class="card">
-    <h2>Pommes &amp; bonus</h2>
-    <p>Grandis en mangeant. Attrape le <em>turbo</em> (vitesse) ou le <em>bouclier</em> (1 choc absorbé).</p>
-  </article>
-  <article class="card">
-    <h2>Skins</h2>
-    <p>Choisis la couleur de ton serpent dans ton profil. Elle est sauvegardée en base SQL.</p>
-  </article>
-</section>
-
-<section class="rules">
-  <h2>Règles rapides</h2>
-  <ul>
-    <li>Flèches ou WASD pour diriger (pas de demi-tour).</li>
-    <li>Toucher un <strong>mur</strong> ou le <strong>corps</strong> de l’adversaire = élimination.</li>
-    <li>Le dernier serpent vivant gagne. Les scores sont enregistrés.</li>
-  </ul>
+  <div class="landing-features">
+    <article class="feature">
+      <div class="num">01</div>
+      <h3>Solo ou duel</h3>
+      <p>Entraîne-toi seul, ou crée une salle et partage le code pour affronter quelqu’un en direct.</p>
+    </article>
+    <article class="feature">
+      <div class="num">02</div>
+      <h3>Coins &amp; skins</h3>
+      <p>Gagne des coins en jouant. Débloque rouge, vert, orange ou jaune — le reste du site reste noir &amp; blanc.</p>
+    </article>
+    <article class="feature">
+      <div class="num">03</div>
+      <h3>Bonus</h3>
+      <p>Attrape le turbo pour accélérer, ou le bouclier pour survivre à un choc.</p>
+    </article>
+  </div>
 </section>
 {% endblock %}
