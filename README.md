@@ -70,21 +70,18 @@ Créés seulement si la base est vide :
 
 | Pseudo | Mot de passe | Coins de départ |
 |---|---|---|
-| `joueur1` | `joueur123` | 100 |
-| `joueur2` | `joueur2123` | 100 |
 | `Shai` | `1234` | 100 |
-| `zoubida` | `1234` | 100 |
 | `noah` | `1234` | 100 |
 
-Sur une base qui existe déjà, `python app.py --comptes` ajoute `Shai`,
-`zoubida` et `noah` s’ils n’existent pas (rien n’est effacé). Ces trois comptes
+Sur une base qui existe déjà, `python app.py --comptes` ajoute `Shai`
+et `noah` s’ils n’existent pas (rien n’est effacé). Ces comptes
 sont créés directement par le serveur : la règle « 6 caractères minimum » reste
 appliquée aux inscriptions faites avec le formulaire.
 
 ### Tester une partie à 2 ou 3 sur un seul ordinateur
 
 1. Navigateur 1 : `Shai` → **Jouer** → choisir **3 joueurs** → **Générer un code** → **Entrer dans la salle**.
-2. Navigateurs 2 et 3 (fenêtre privée, autre navigateur) : `zoubida`, puis `noah` → **Jouer** → taper le code → **Rejoindre**.
+2. Navigateurs 2 et 3 (fenêtre privée, autre navigateur) : `noah`, puis un compte créé avec **S’inscrire** → **Jouer** → taper le code → **Rejoindre**.
 3. La partie démarre quand la salle est pleine, après un compte à rebours de 3 s.
 
 Le même compte ne peut pas jouer contre lui-même dans deux onglets.

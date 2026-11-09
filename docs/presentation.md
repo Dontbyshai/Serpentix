@@ -131,7 +131,7 @@ est décrit dans **[architecture.md](architecture.md)**.
 | v3 | Mise en ligne sur un serveur (port configurable) |
 | v4 | Interface strictement noir et blanc, serpent animé en fond |
 | v5 | Audit complet : corrections de bugs, sécurité (CSRF, anti-triche), contrôles mobiles, compte à rebours, tests, commentaires et documentation |
-| v6 | Jeu ralenti (7 pas/s), parties à 3, 4 nouveaux bonus, écrans de fin animés, classement avec podium et tri, arène animée sur l’accueil, page bloquée pendant le jeu, comptes Shai / zoubida / noah |
+| v6 | Jeu ralenti (7 pas/s), parties à 3, 4 nouveaux bonus, écrans de fin animés, classement avec podium et tri, arène animée sur l’accueil, page bloquée pendant le jeu, comptes Shai / noah |
 
 ---
 

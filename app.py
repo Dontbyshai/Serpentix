@@ -15,7 +15,7 @@ Rôle de ce fichier : c'est le « serveur web » du projet.
     redemande).
 
 Lancement :  python app.py   puis   http://127.0.0.1:5000
-Comptes   :  python app.py --comptes   crée les comptes Shai, zoubida et noah
+Comptes   :  python app.py --comptes   crée les comptes Shai et noah
              s'ils n'existent pas encore (sans rien effacer).
 """
 
@@ -102,7 +102,7 @@ BONUS_INFOS = {
 # Comptes de joueurs demandés pour la classe (mot de passe 1234).
 # Ils sont créés directement par le serveur avec un hash Werkzeug : la règle
 # « 6 caractères minimum » reste appliquée aux inscriptions par formulaire.
-COMPTES_DE_BASE = (("Shai", "1234"), ("zoubida", "1234"), ("noah", "1234"))
+COMPTES_DE_BASE = (("Shai", "1234"), ("noah", "1234"))
 
 # --- Anti-triche du mode solo (voir api_solo_debut / api_solo_fin) ---------
 SOLO_COINS_MAX = 80             # plafond de coins par partie solo
@@ -904,18 +904,9 @@ def on_disconnect(*args):
 # Démarrage
 # ---------------------------------------------------------------------------
 
-def creer_joueurs_demo_si_vide():
-    """Base vide → crée deux comptes de démonstration (100 coins chacun)."""
-    if not db.lister_utilisateurs():
-        for pseudo, mdp in (("joueur1", "joueur123"), ("joueur2", "joueur2123")):
-            db.creer_utilisateur(pseudo, f"{pseudo}@serpentix.local",
-                                 generate_password_hash(mdp), "#ffffff",
-                                 est_admin=0, coins=100, skins_debloques="blanc")
-
-
 def creer_comptes_de_base():
     """
-    Crée les comptes de COMPTES_DE_BASE (Shai, zoubida, noah) s'ils n'existent
+    Crée les comptes de COMPTES_DE_BASE (Shai, noah) s'ils n'existent
     pas encore. Ne supprime et ne modifie RIEN : un compte déjà présent (même
     pseudo, sans tenir compte des majuscules) est laissé tel quel.
     Passe par les fonctions normales du projet : db.creer_utilisateur() et
@@ -943,13 +934,12 @@ if __name__ == "__main__":
         print("Comptes créés :", ", ".join(creer_comptes_de_base()) or "aucun (déjà là)")
         sys.exit(0)
     if not db.lister_utilisateurs():
-        # Base toute neuve : comptes de démonstration + comptes de la classe
-        creer_joueurs_demo_si_vide()
+        # Base toute neuve : on crée les comptes de la classe
         creer_comptes_de_base()
     assurer_boucle()
     host = os.environ.get("SERPENTIX_HOST", "0.0.0.0")
     port = int(os.environ.get("SERPENTIX_PORT", "5000"))
     print(f"Serpentix prêt → http://{host}:{port}")
-    print("Comptes démo : joueur1 / joueur123, joueur2 / joueur2123, Shai / 1234")
+    print("Comptes : Shai / 1234, noah / 1234")
     # allow_unsafe_werkzeug : serveur de développement, suffisant pour un projet scolaire
     socketio.run(app, host=host, port=port, debug=False, allow_unsafe_werkzeug=True)
