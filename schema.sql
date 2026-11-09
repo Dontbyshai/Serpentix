@@ -25,8 +25,10 @@ CREATE TABLE IF NOT EXISTS parties (
     vainqueur_id INTEGER,                     -- NULL tant que la partie n'est pas finie
     date_creation TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     date_fin TEXT,
-    FOREIGN KEY (createur_id) REFERENCES utilisateurs(id),
-    FOREIGN KEY (vainqueur_id) REFERENCES utilisateurs(id)
+    -- Si le créateur supprime son compte, ses parties sont supprimées aussi
+    FOREIGN KEY (createur_id) REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    -- Si le vainqueur supprime son compte, on garde la partie sans vainqueur
+    FOREIGN KEY (vainqueur_id) REFERENCES utilisateurs(id) ON DELETE SET NULL
 );
 
 -- Table des participations / scores (lien N-N utilisateurs ↔ parties)
@@ -41,6 +43,6 @@ CREATE TABLE IF NOT EXISTS participations (
     UNIQUE (utilisateur_id, partie_id)
 );
 
--- Index pour accélérer le classement
+-- Index : accélèrent les recherches (comme l'index d'un livre)
 CREATE INDEX IF NOT EXISTS idx_participations_score ON participations(score DESC);
 CREATE INDEX IF NOT EXISTS idx_parties_code ON parties(code);

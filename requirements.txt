@@ -1,5 +1,4 @@
-# Dépendances du projet Serpentix (NSI)
-Flask>=3.0.0
-Flask-SocketIO>=5.3.0
-eventlet>=0.35.0
-Werkzeug>=3.0.0
+# Dépendances Python de Serpentix (installer avec : pip install -r requirements.txt)
+Flask>=3.0.0           # micro-framework web : routes, templates Jinja, sessions
+Flask-SocketIO>=5.3.0  # temps réel (WebSocket) pour le 1v1
+Werkzeug>=3.0.0        # hachage des mots de passe (fourni avec Flask)
