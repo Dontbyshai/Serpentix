@@ -2,6 +2,7 @@
 {% extends "base.html" %}
 {% block title %}{{ user.pseudo }} · Serpentix{% endblock %}
 {% block content %}
+<!-- Fiche d'un joueur (affichage individuel) : identité, coins, skin, dernières parties. -->
 <h1><span class="swatch lg" style="background:{{ user.couleur_skin }}"></span> {{ user.pseudo }}</h1>
 <ul class="fiche">
   <li><strong>ID :</strong> {{ user.id }}</li>

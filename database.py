@@ -14,6 +14,10 @@ injection SQL du type  ' OR 1=1 --  est impossible.
 
 Tables (voir schema.sql et docs/schema.md) :
   utilisateurs, parties (2 ou 3 joueurs), participations.
+
+Deux classements (voir les fonctions en bas de ce fichier) :
+  - classement()             : de groupe, d'après le vainqueur de la partie ;
+  - classement_individuel()  : une ligne par compte, d'après ses participations.
 """
 
 import os
@@ -461,9 +465,9 @@ def terminer_partie(partie_id, vainqueur_id, scores):
             ajouter_coins(uid, gain)
 
 
-# Tris autorisés pour le classement. On ne colle JAMAIS dans la requête SQL
-# un texte venu de l'URL : on choisit une clause ORDER BY dans cette liste
-# blanche (sinon ?tri=... permettrait une injection SQL).
+# Tris autorisés pour le classement DE GROUPE. On ne colle JAMAIS dans la
+# requête SQL un texte venu de l'URL : on choisit une clause ORDER BY dans
+# cette liste blanche (sinon ?tri=... permettrait une injection SQL).
 TRIS_CLASSEMENT = {
     "victoires": "victoires DESC, ratio DESC, meilleur_score DESC",
     "ratio": "ratio DESC, victoires DESC, parties_jouees DESC",
@@ -471,10 +475,28 @@ TRIS_CLASSEMENT = {
     "coins": "coins DESC, victoires DESC",
 }
 
+# Tris autorisés pour le classement INDIVIDUEL. Même principe de liste
+# blanche : seules ces phrases SQL (écrites ici, pas reçues du navigateur)
+# peuvent servir de ORDER BY. Les clés correspondent aux onglets de la page.
+TRIS_CLASSEMENT_INDIVIDUEL = {
+    "victoires": "victoires DESC, ratio DESC, meilleur_score DESC",
+    "nuls": "nuls DESC, parties_jouees DESC, victoires DESC",
+    "defaites": "defaites DESC, parties_jouees DESC, victoires DESC",
+    "ratio": "ratio DESC, victoires DESC, parties_jouees DESC",
+    "score": "meilleur_score DESC, victoires DESC, parties_jouees DESC",
+    "coins": "coins DESC, meilleur_score DESC, victoires DESC",
+    "parties": "parties_jouees DESC, victoires DESC, meilleur_score DESC",
+}
+
 
 def classement(tri="victoires", limit=50):
     """
-    Classement global, calculé ENTIÈREMENT en SQL (jointures + agrégats).
+    Classement DE GROUPE, calculé ENTIÈREMENT en SQL (jointures + agrégats).
+
+    « De groupe » : on lit le résultat de la PARTIE (table parties,
+    colonne vainqueur_id), c'est-à-dire qui a gagné le match à 2 ou 3.
+    Le classement individuel (fonction classement_individuel) lit plutôt
+    la ligne personnelle de chaque joueur (table participations).
 
     Paramètres : tri (clé de TRIS_CLASSEMENT), limit (int).
     Retour     : liste de dict (id, pseudo, couleur_skin, coins,
@@ -521,6 +543,78 @@ def classement(tri="victoires", limit=50):
         )
         rows = [dict(row) for row in cur.fetchall()]
     return rows
+
+
+def classement_individuel(tri="victoires", limit=50):
+    """
+    Classement INDIVIDUEL : une ligne par compte joueur, avec SES stats.
+
+    Paramètres : tri (clé de TRIS_CLASSEMENT_INDIVIDUEL), limit (int, 50
+                 par défaut — on n'affiche pas toute la base d'un coup).
+    Retour     : liste de dict, du mieux classé au moins bien classé.
+                 Clés : id, pseudo, couleur_skin, coins, parties_jouees,
+                 victoires, nuls, defaites, ratio (pourcentage, 1 décimale),
+                 meilleur_score, score_total.
+
+    Différence avec classement() (classement de groupe) :
+      - ici une victoire, c'est le drapeau personnel participations.a_gagne
+        (1 si CE joueur a gagné), pas parties.vainqueur_id ;
+      - le meilleur score est le MAX de SES scores (participations.score) ;
+      - les coins sont ceux du compte (utilisateurs.coins), pas un calcul
+        de partie.
+    Le match nul reste une propriété de la partie (aucun vainqueur) : on le
+    compte seulement si le joueur n'a pas, en plus, une victoire personnelle.
+    Ainsi défaites = parties - victoires - nuls ne devient jamais négatif.
+
+    Comme pour le classement de groupe :
+      - LEFT JOIN : un compte qui n'a jamais joué apparaît quand même (des 0) ;
+      - seules les parties terminées comptent (condition dans le ON) ;
+      - le texte de ?tri= n'est jamais collé dans le SQL (liste blanche).
+    """
+    # Clé inconnue → tri par victoires (même garde-fou que le classement de groupe).
+    ordre = TRIS_CLASSEMENT_INDIVIDUEL.get(tri, TRIS_CLASSEMENT_INDIVIDUEL["victoires"])
+    with db_cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT t.*,
+                   -- Défaites déduites des totaux (pas stockées telles quelles).
+                   t.parties_jouees - t.victoires - t.nuls AS defaites,
+                   -- Pourcentage de victoires. Si le joueur n'a aucune partie,
+                   -- on renvoie 0 au lieu de diviser par zéro.
+                   CASE WHEN t.parties_jouees = 0 THEN 0
+                        ELSE ROUND(100.0 * t.victoires / t.parties_jouees, 1)
+                   END AS ratio
+            FROM (
+                SELECT
+                    u.id, u.pseudo, u.couleur_skin, u.coins,
+                    -- COUNT ignore les NULL : une partie non terminée
+                    -- (pa.id NULL à cause du LEFT JOIN) ne compte pas.
+                    COUNT(pa.id) AS parties_jouees,
+                    -- Victoire personnelle : le drapeau a_gagne de SA ligne.
+                    COALESCE(SUM(CASE WHEN pa.id IS NOT NULL AND p.a_gagne = 1
+                                      THEN 1 ELSE 0 END), 0) AS victoires,
+                    -- Nul : partie finie sans vainqueur, et ce joueur n'est
+                    -- pas marqué gagnant sur sa propre ligne.
+                    COALESCE(SUM(CASE WHEN pa.id IS NOT NULL AND p.a_gagne = 0
+                                           AND pa.vainqueur_id IS NULL
+                                      THEN 1 ELSE 0 END), 0) AS nuls,
+                    -- Meilleur score perso : le plus gros score de SES parties finies.
+                    COALESCE(MAX(CASE WHEN pa.id IS NOT NULL THEN p.score END), 0)
+                        AS meilleur_score,
+                    COALESCE(SUM(CASE WHEN pa.id IS NOT NULL THEN p.score END), 0)
+                        AS score_total
+                FROM utilisateurs u
+                LEFT JOIN participations p ON p.utilisateur_id = u.id
+                LEFT JOIN parties pa ON pa.id = p.partie_id AND pa.statut = 'terminee'
+                GROUP BY u.id
+            ) AS t
+            -- ordre vient de la liste blanche, puis le pseudo départage les égalités.
+            ORDER BY {ordre}, t.pseudo COLLATE NOCASE ASC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        return [dict(row) for row in cur.fetchall()]
 
 
 def historique_utilisateur(user_id, limit=10):

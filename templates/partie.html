@@ -4,6 +4,7 @@
 {# page-jeu : la page tient dans l'écran et ne défile pas (voir style.css) #}
 {% block body_class %}page-jeu{% endblock %}
 {% block content %}
+<!-- Salle multijoueur. Le canvas est dessiné par game.js à partir de l'état reçu en Socket.IO. -->
 <div class="game-header">
   <h1>Salle <code id="room-code">{{ code }}</code></h1>
   <p id="game-status" class="hud-status">Connexion…</p>

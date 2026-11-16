@@ -23,7 +23,12 @@ from game_engine import PartieEnCours, Serpent, code_valide, positions_depart  #
 
 
 def partie_prete(nb=2):
-    """Crée une partie à nb joueurs (2 ou 3), démarrée, sans pommes ni bonus ni décompte."""
+    """
+    Crée une partie de test déjà démarrée, sans pommes, sans bonus et sans décompte.
+
+    Paramètre : nb (int) — 2 ou 3 joueurs.
+    Retour    : PartieEnCours prête pour un tick().
+    """
     p = PartieEnCours("TEST01", max_joueurs=nb)
     p.ajouter_joueur("a", 1, "Alice", "#ffffff")
     p.ajouter_joueur("b", 2, "Bob", "#ef4444")
@@ -38,7 +43,13 @@ def partie_prete(nb=2):
 
 
 def placer(p, sid, corps, direction):
-    """Place le serpent sid avec un corps (tête en premier) et une direction."""
+    """
+    Place un serpent à la main pour tester une collision précise.
+
+    Paramètres : p (PartieEnCours), sid (str), corps (liste de cases, tête en premier),
+                 direction (tuple dx, dy).
+    Retour     : None.
+    """
     s = p.joueurs[sid]
     s.corps = list(corps)
     s.direction = direction
@@ -46,7 +57,12 @@ def placer(p, sid, corps, direction):
 
 
 def loin(p, sid, y):
-    """Range le serpent sid sur une ligne lointaine (il avance vers la droite sans danger)."""
+    """
+    Range un serpent loin du danger, sur la ligne y, en train d'aller à droite.
+
+    Paramètres : p (PartieEnCours), sid (str), y (int, numéro de ligne).
+    Retour     : None.
+    """
     placer(p, sid, [(5, y), (4, y), (3, y)], (1, 0))
 
 
@@ -54,6 +70,7 @@ class TestRegles(unittest.TestCase):
     """Règles de base (déjà valables en 1 contre 1)."""
 
     def test_vitesse_unique(self):
+        """Vérifie qu'une seule constante (TICKS_PAR_SECONDE) règle la vitesse, le compte à rebours et le turbo. Aucun paramètre. Retour : rien (assertions)."""
         # Toutes les durées découlent de TICKS_PAR_SECONDE
         self.assertEqual(ge.DECOMPTE_TICKS, 3 * ge.TICKS_PAR_SECONDE)
         self.assertEqual(ge.BONUS["turbo"]["duree"], 3 * ge.TICKS_PAR_SECONDE)
@@ -61,23 +78,27 @@ class TestRegles(unittest.TestCase):
         self.assertEqual(ge.PAS_TURBO, 2)               # turbo = 2 x la vitesse
 
     def test_code_valide(self):
+        """Vérifie le format d'un code de salle : 6 caractères, majuscules et chiffres seulement. Aucun paramètre. Retour : rien (assertions)."""
         self.assertTrue(code_valide("AB12CD"))
         self.assertFalse(code_valide("ab12cd"))   # minuscules refusées
         self.assertFalse(code_valide("AB12"))     # trop court
         self.assertFalse(code_valide("<scrip"))   # caractères interdits
 
     def test_demi_tour_interdit(self):
+        """Un serpent qui va à droite ne peut pas demander d'aller à gauche (demi-tour). Aucun paramètre. Retour : rien (assertions)."""
         s = Serpent(1, "x", "#fff", (10, 10), (1, 0))
         s.changer_direction(-1, 0)                # gauche alors qu'on va à droite
         self.assertEqual(s.file_directions, [])
 
     def test_file_de_virages(self):
+        """Deux virages rapides sont mémorisés dans l'ordre, aucun n'est perdu. Aucun paramètre. Retour : rien (assertions)."""
         s = Serpent(1, "x", "#fff", (10, 10), (1, 0))
         s.changer_direction(0, -1)                # haut
         s.changer_direction(-1, 0)                # puis gauche (valide après haut)
         self.assertEqual(s.file_directions, [(0, -1), (-1, 0)])
 
     def test_mur_elimine(self):
+        """Toucher un mur élimine le serpent ; l'autre gagne. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete()
         placer(p, "a", [(39, 5), (38, 5), (37, 5)], (1, 0))
         placer(p, "b", [(10, 20), (11, 20), (12, 20)], (-1, 0))
@@ -86,6 +107,7 @@ class TestRegles(unittest.TestCase):
         self.assertEqual(p.vainqueur_sid, "b")
 
     def test_tete_dans_le_corps_adverse(self):
+        """Mettre sa tête dans le corps d'un adversaire élimine, l'adversaire survit. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete()
         placer(p, "a", [(10, 9), (10, 8), (10, 7)], (0, 1))       # descend
         placer(p, "b", [(12, 10), (11, 10), (10, 10), (9, 10)], (1, 0))
@@ -94,6 +116,7 @@ class TestRegles(unittest.TestCase):
         self.assertTrue(p.joueurs["b"].vivant)
 
     def test_tete_contre_tete_egalite(self):
+        """Tête contre tête à longueur égale : les deux meurent, match nul. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete()
         placer(p, "a", [(10, 10), (9, 10), (8, 10)], (1, 0))
         placer(p, "b", [(12, 10), (13, 10), (14, 10)], (-1, 0))   # même case (11,10)
@@ -103,6 +126,7 @@ class TestRegles(unittest.TestCase):
         self.assertIn("nul", p.message_fin.lower())
 
     def test_tete_contre_tete_le_plus_long_gagne(self):
+        """Tête contre tête : le serpent le plus long survit. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete()
         placer(p, "a", [(10, 10), (9, 10), (8, 10), (7, 10)], (1, 0))  # 4 cases
         placer(p, "b", [(11, 10), (12, 10), (13, 10)], (-1, 0))        # croisement
@@ -111,6 +135,7 @@ class TestRegles(unittest.TestCase):
         self.assertFalse(p.joueurs["b"].vivant)
 
     def test_bouclier_annule_un_choc(self):
+        """Le bouclier annule un mur, est consommé, et le serpent pivote. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete()
         placer(p, "a", [(39, 5), (38, 5), (37, 5)], (1, 0))
         placer(p, "b", [(10, 20), (11, 20), (12, 20)], (-1, 0))
@@ -124,6 +149,7 @@ class TestRegles(unittest.TestCase):
         self.assertTrue(a.vivant)                  # et ne retape pas le mur
 
     def test_turbo_ne_traverse_pas_un_corps(self):
+        """Même en turbo, on ne saute pas par-dessus le corps d'un adversaire. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete()
         placer(p, "a", [(10, 10), (9, 10), (8, 10)], (1, 0))
         placer(p, "b", [(11, 12), (11, 11), (11, 10), (11, 9), (11, 8)], (0, 1))
@@ -132,6 +158,7 @@ class TestRegles(unittest.TestCase):
         self.assertFalse(p.joueurs["a"].vivant)    # bloqué par le corps de b
 
     def test_turbo_avance_deux_fois_plus_vite(self):
+        """En turbo on avance de 2 cases par tick, les autres d'une seule. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete()
         loin(p, "a", 5)
         loin(p, "b", 20)
@@ -141,6 +168,7 @@ class TestRegles(unittest.TestCase):
         self.assertEqual(p.joueurs["b"].corps[0], (6, 20))  # 1 case
 
     def test_pomme_fait_grandir(self):
+        """Manger une pomme donne 1 point et allonge le serpent d'une case. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete()
         placer(p, "a", [(10, 10), (9, 10), (8, 10)], (1, 0))
         placer(p, "b", [(10, 20), (11, 20), (12, 20)], (-1, 0))
@@ -152,6 +180,7 @@ class TestRegles(unittest.TestCase):
         self.assertEqual(len(a.corps), 4)
 
     def test_meme_compte_deux_fois(self):
+        """Le même compte ne peut pas avoir deux serpents (deux onglets). Aucun paramètre. Retour : rien (assertions)."""
         p = PartieEnCours("TEST02")
         p.ajouter_joueur("onglet1", 1, "Alice", "#fff")
         p.ajouter_joueur("onglet2", 1, "Alice", "#fff")   # même compte
@@ -159,6 +188,7 @@ class TestRegles(unittest.TestCase):
         self.assertFalse(p.peut_demarrer())
 
     def test_forfait(self):
+        """Si un joueur quitte un duel, l'autre gagne et les scores sont conservés. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete()
         self.assertTrue(p.retirer_joueur("b"))
         self.assertEqual(p.statut, "terminee")
@@ -170,6 +200,7 @@ class TestTroisJoueurs(unittest.TestCase):
     """Parties à 3 : salle, départs équitables, collisions et vainqueur."""
 
     def test_salle_de_3_demarre_quand_pleine(self):
+        """Une salle de 3 ne démarre qu'à 3 joueurs ; le 4e est refusé. Aucun paramètre. Retour : rien (assertions)."""
         p = PartieEnCours("TEST03", max_joueurs=3)
         p.ajouter_joueur("a", 1, "A", "#fff")
         p.ajouter_joueur("b", 2, "B", "#fff")
@@ -181,9 +212,11 @@ class TestTroisJoueurs(unittest.TestCase):
         self.assertIn("3", msg)
 
     def test_max_joueurs_invalide(self):
+        """Un nombre de joueurs autre que 2 ou 3 est ramené à 2. Aucun paramètre. Retour : rien (assertions)."""
         self.assertEqual(PartieEnCours("X", max_joueurs=9).max_joueurs, 2)
 
     def test_departs_equitables(self):
+        """À 3, les trois départs sont distincts et à la même distance du mur. Aucun paramètre. Retour : rien (assertions)."""
         places = positions_depart(3)
         cases = [c for c, _ in places]
         self.assertEqual(len(set(cases)), 3)              # trois cases différentes
@@ -205,6 +238,7 @@ class TestTroisJoueurs(unittest.TestCase):
         self.assertEqual(len(p._vivants()), 3)
 
     def test_places_donnees_au_demarrage(self):
+        """Les cases de départ sont données au démarrage, pas à l'arrivée. Aucun paramètre. Retour : rien (assertions)."""
         # a part de la salle d'attente, d arrive : pas deux serpents sur la même case
         p = PartieEnCours("TEST05", max_joueurs=3)
         for i, sid in enumerate("abc"):
@@ -216,6 +250,7 @@ class TestTroisJoueurs(unittest.TestCase):
         self.assertEqual(len(set(tetes)), 3)
 
     def test_un_mort_la_partie_continue(self):
+        """À 3, un serpent éliminé lâche des pommes et la partie continue. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete(3)
         placer(p, "a", [(39, 5), (38, 5), (37, 5)], (1, 0))   # va dans le mur
         loin(p, "b", 15)
@@ -226,6 +261,7 @@ class TestTroisJoueurs(unittest.TestCase):
         self.assertTrue(p.pommes)                  # a lâché des pommes
 
     def test_dernier_vivant_gagne(self):
+        """Le dernier serpent en vie est déclaré vainqueur. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete(3)
         p.joueurs["a"].vivant = False
         placer(p, "b", [(39, 5), (38, 5), (37, 5)], (1, 0))   # mur
@@ -235,6 +271,7 @@ class TestTroisJoueurs(unittest.TestCase):
         self.assertEqual(p.etat_public()["vainqueur_id"], 3)
 
     def test_tete_a_tete_a_trois_le_plus_long_survit(self):
+        """Trois têtes sur la même case : seul le plus long survit. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete(3)
         # Les 3 têtes arrivent sur la case (10, 10) au même tick
         placer(p, "a", [(9, 10), (8, 10), (7, 10), (6, 10)], (1, 0))    # 4 cases
@@ -247,6 +284,7 @@ class TestTroisJoueurs(unittest.TestCase):
         self.assertEqual(p.vainqueur_sid, "a")
 
     def test_tete_a_tete_a_deux_pendant_une_partie_a_trois(self):
+        """Si deux serpents s'éliminent, le troisième gagne. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete(3)
         placer(p, "a", [(10, 10), (9, 10), (8, 10)], (1, 0))
         placer(p, "b", [(12, 10), (13, 10), (14, 10)], (-1, 0))         # égalité
@@ -255,6 +293,7 @@ class TestTroisJoueurs(unittest.TestCase):
         self.assertEqual(p.vainqueur_sid, "c")
 
     def test_match_nul_a_trois(self):
+        """Si les deux derniers meurent ensemble, la partie est nulle. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete(3)
         p.joueurs["c"].vivant = False
         placer(p, "a", [(10, 10), (9, 10), (8, 10)], (1, 0))
@@ -264,6 +303,7 @@ class TestTroisJoueurs(unittest.TestCase):
         self.assertIn("nul", p.message_fin.lower())
 
     def test_depart_d_un_joueur_a_trois(self):
+        """À 3, un départ ne termine pas la partie ; le deuxième fait gagner le dernier. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete(3)
         self.assertFalse(p.retirer_joueur("a"))    # il reste b et c : on continue
         self.assertEqual(p.statut, "en_cours")
@@ -276,6 +316,7 @@ class TestBonus(unittest.TestCase):
     """Les nouveaux bonus : fantôme, aimant, ciseaux, gel."""
 
     def test_fantome_traverse_un_corps(self):
+        """Le fantôme traverse le corps d'un adversaire. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete()
         placer(p, "a", [(10, 10), (9, 10), (8, 10)], (1, 0))
         placer(p, "b", [(11, 12), (11, 11), (11, 10), (11, 9), (11, 8)], (0, 1))
@@ -285,6 +326,7 @@ class TestBonus(unittest.TestCase):
         self.assertTrue(p.joueurs["b"].vivant)
 
     def test_fantome_ne_traverse_pas_les_murs(self):
+        """Le fantôme ne traverse pas les murs. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete()
         placer(p, "a", [(39, 5), (38, 5), (37, 5)], (1, 0))
         loin(p, "b", 20)
@@ -293,6 +335,7 @@ class TestBonus(unittest.TestCase):
         self.assertFalse(p.joueurs["a"].vivant)
 
     def test_aimant_attire_les_pommes(self):
+        """L'aimant rapproche une pomme proche et laisse une pomme lointaine. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete()
         loin(p, "a", 5)                            # tête en (5,5) → (6,5)
         loin(p, "b", 20)
@@ -303,6 +346,7 @@ class TestBonus(unittest.TestCase):
         self.assertEqual(p.pommes[1], (30, 25))    # trop loin : ne bouge pas
 
     def test_ciseaux_coupent_l_ennemi_le_plus_proche(self):
+        """Les ciseaux coupent la moitié du serpent le plus proche. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete(3)
         loin(p, "a", 5)
         corps_b = [(15 - i, 8) for i in range(10)]        # 10 cases, proche de a
@@ -316,6 +360,7 @@ class TestBonus(unittest.TestCase):
         self.assertTrue(p.pommes)                         # morceaux → pommes
 
     def test_gel_ralentit_les_autres(self):
+        """Le gel ralentit les adversaires, pas le joueur qui l'a pris. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete(3)
         loin(p, "a", 5)
         loin(p, "b", 15)
@@ -330,6 +375,7 @@ class TestBonus(unittest.TestCase):
         self.assertFalse(p.joueurs["a"].a_effet("gel"))   # pas soi-même
 
     def test_effets_dans_l_etat_public(self):
+        """L'état envoyé au navigateur donne le temps restant des effets en secondes. Aucun paramètre. Retour : rien (assertions)."""
         p = partie_prete()
         p.joueurs["a"].effets["turbo"] = ge.TICKS_PAR_SECONDE * 2
         serpent = p.etat_public()["serpents"][0]
@@ -337,6 +383,7 @@ class TestBonus(unittest.TestCase):
         self.assertTrue(serpent["turbo"])
 
     def test_tous_les_types_existent(self):
+        """Les 6 bonus existent et le tirage au sort ne sort jamais un type inconnu. Aucun paramètre. Retour : rien (assertions)."""
         self.assertEqual(set(ge.BONUS),
                          {"turbo", "bouclier", "fantome", "aimant", "ciseaux", "gel"})
         for _ in range(50):

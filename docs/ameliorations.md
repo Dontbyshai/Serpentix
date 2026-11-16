@@ -2,6 +2,17 @@
 
 Liste classée par priorité. Chaque idée reste dans le cadre du programme de NSI.
 
+## Déjà réalisé (version 7)
+
+- **Classement individuel** en plus du classement de groupe : une requête SQL
+  par compte (`database.classement_individuel`), la route
+  `/classement/individuel`, et un bouton sur la page pour basculer.
+  Colonnes : parties jouées, victoires, nuls, défaites, % de victoires,
+  meilleur score, coins. Tris : ces colonnes, via une liste blanche.
+- Commentaires en français dans le code (rôle du fichier, fonctions,
+  blocs importants) et section « Qui fait quoi dans le code » dans le README
+  et dans [architecture.md](architecture.md).
+
 ## Déjà réalisé (version 6)
 
 - Jeu ralenti : 7 pas par seconde au lieu de 10, réglé par une seule constante

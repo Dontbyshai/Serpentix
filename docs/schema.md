@@ -190,6 +190,43 @@ Explications :
   `score`, `coins`). Elle est prise dans le dictionnaire `TRIS_CLASSEMENT` (liste
   blanche) : le texte de l’URL n’est jamais collé dans la requête.
 
+Classement **individuel** (page `/classement/individuel`, fonction
+`database.classement_individuel`). Même forme (sous-requête + pourcentages),
+mais les victoires et le meilleur score sont lus sur la **ligne du joueur**
+(`participations`), pas sur le vainqueur de la partie :
+
+```sql
+SELECT t.*,
+       t.parties_jouees - t.victoires - t.nuls AS defaites,
+       CASE WHEN t.parties_jouees = 0 THEN 0
+            ELSE ROUND(100.0 * t.victoires / t.parties_jouees, 1)
+       END AS ratio
+FROM (
+    SELECT
+        u.id, u.pseudo, u.couleur_skin, u.coins,
+        COUNT(pa.id) AS parties_jouees,
+        COALESCE(SUM(CASE WHEN pa.id IS NOT NULL AND p.a_gagne = 1
+                          THEN 1 ELSE 0 END), 0) AS victoires,
+        COALESCE(SUM(CASE WHEN pa.id IS NOT NULL AND p.a_gagne = 0
+                               AND pa.vainqueur_id IS NULL
+                          THEN 1 ELSE 0 END), 0) AS nuls,
+        COALESCE(MAX(CASE WHEN pa.id IS NOT NULL THEN p.score END), 0) AS meilleur_score,
+        COALESCE(SUM(CASE WHEN pa.id IS NOT NULL THEN p.score END), 0) AS score_total
+    FROM utilisateurs u
+    LEFT JOIN participations p ON p.utilisateur_id = u.id
+    LEFT JOIN parties pa ON pa.id = p.partie_id AND pa.statut = 'terminee'
+    GROUP BY u.id
+) AS t
+ORDER BY victoires DESC, ratio DESC, meilleur_score DESC, t.pseudo COLLATE NOCASE ASC
+LIMIT ?;
+```
+
+- `p.a_gagne = 1` : ce joueur est marqué gagnant sur **sa** participation.
+- `MAX(p.score)` : son record personnel, pas le score de quelqu’un d’autre.
+- `u.coins` : le solde du compte (affiché dans la colonne Coins).
+- Les tris en plus (`nuls`, `defaites`, `parties`) viennent de
+  `TRIS_CLASSEMENT_INDIVIDUEL`, une deuxième liste blanche.
+
 Historique d’un joueur :
 
 ```sql

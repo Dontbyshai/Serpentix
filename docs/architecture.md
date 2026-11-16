@@ -82,7 +82,8 @@ source de vérité. Pour éviter qu’on s’invente des coins :
 | GET | `/deconnexion` | `deconnexion` | non | Déconnexion |
 | GET, POST | `/profil` | `profil` | oui | UPDATE e-mail / mot de passe |
 | GET, POST | `/boutique` | `boutique` | oui | Acheter / équiper un skin |
-| GET | `/classement?tri=…` | `classement` | non | Podium + classement SQL triable |
+| GET | `/classement?tri=…` | `classement` | non | Classement de groupe (vainqueur de chaque partie) |
+| GET | `/classement/individuel?tri=…` | `classement_individuel` | non | Classement individuel (stats de chaque compte) |
 | GET | `/jouer` | `jouer` | oui | Hub solo / multijoueur |
 | GET | `/partie/<code>` | `partie` | oui | Salle de 2 ou 3 |
 | GET | `/solo` | `solo` | oui | Mode solo |
@@ -140,3 +141,79 @@ l’écran). Deux protections :
 
 Le plateau n’accepte ni sélection de texte ni glisser-déposer (`user-select:
 none`, `dragstart` annulé).
+
+## Qui fait quoi dans le code
+
+Trois fichiers Python se partagent le travail, pour pouvoir expliquer chaque
+morceau à l’oral sans tout mélanger :
+
+| Fichier | Ce qu’il fait | Ce qu’il ne fait pas |
+|---|---|---|
+| `app.py` | Reçoit les pages et les formulaires, vérifie les données, garde la session, protège avec le jeton CSRF, fait tourner Socket.IO et la boucle de jeu (7 fois par seconde) | N’écrit pas de SQL |
+| `database.py` | Toutes les requêtes : créer / lire / modifier / supprimer un joueur, coins, skins, parties, **classement de groupe** (`classement`) et **classement individuel** (`classement_individuel`) | N’affiche pas de HTML |
+| `game_engine.py` | Règles : déplacer les serpents, collisions, pommes, 6 bonus, fin de partie | Ne connaît ni Flask ni SQLite |
+
+### Les deux classements
+
+- **Groupe** — route `/classement`, fonction `database.classement`. On lit
+  `parties.vainqueur_id` : qui a gagné la partie à 2 ou 3. Tris : victoires,
+  % de victoires, meilleur score, coins.
+- **Individuel** — route `/classement/individuel`, fonction
+  `database.classement_individuel`. Une ligne par compte. Victoires lues sur
+  `participations.a_gagne`, meilleur score = `MAX(participations.score)`,
+  coins = solde du compte. Tris en plus : nuls, défaites, parties jouées.
+- Le bouton en haut de `templates/classement.html` bascule d’une vue à
+  l’autre. Le paramètre `?tri=` est toujours choisi dans une liste blanche
+  (`TRIS_CLASSEMENT` ou `TRIS_CLASSEMENT_INDIVIDUEL`) : le texte de l’URL
+  n’est jamais collé dans le SQL.
+
+### Pages HTML (`templates/`)
+
+| Fichier | Rôle |
+|---|---|
+| `base.html` | Gabarit de toutes les pages : menu, pied de page, jeton CSRF, fond |
+| `accueil.html` | Présentation et bouton Jouer |
+| `connexion.html` | Formulaire de connexion |
+| `inscription.html` | Formulaire de création de compte |
+| `lobby.html` | Page Jouer : solo, créer une salle de 2 ou 3, rejoindre avec un code |
+| `partie.html` | Salle multijoueur : le canvas, le code, la légende des bonus |
+| `solo.html` | Mode solo |
+| `classement.html` | Podium et tableau, vue groupe ou vue individuelle |
+| `boutique.html` | Grille des skins (acheter / équiper) |
+| `profil.html` | Modifier son e-mail ou son mot de passe, voir son historique |
+| `utilisateurs_liste.html` | Tableau de tous les joueurs (CRUD, affichage collectif) |
+| `utilisateur_detail.html` | Fiche d’un joueur (affichage individuel) |
+| `utilisateur_modifier.html` | Formulaire de mise à jour |
+| `utilisateur_nouveau.html` | Formulaire de création |
+| `_historique.html` | Dernières parties, inclus dans le profil et la fiche |
+| `_legende.html` | Liste des bonus, incluse dans solo et partie |
+| `_dpad.html` | Flèches pour l’écran tactile |
+| `_fin.html` | Écran de victoire, défaite ou match nul |
+
+### JavaScript (`static/js/`)
+
+| Fichier | Rôle |
+|---|---|
+| `main.js` | Ouvre et ferme le menu sur un petit écran |
+| `bg-snake.js` | Arène décorative : des serpents automatiques jouent derrière l’accueil et Jouer |
+| `validation.js` | Vérifie les formulaires avant l’envoi (le serveur revérifie) |
+| `lobby.js` | Appelle `/api/partie/creer` et `/api/partie/rejoindre` |
+| `dessin.js` | Dessine le plateau, les bonus et les serpents (utilisé par le solo et le multijoueur) |
+| `controles.js` | Clavier, doigt, flèches, et bloque le défilement de la page pendant la partie |
+| `fin.js` | Anime l’écran de fin |
+| `solo.js` | Fait tourner la partie solo dans le navigateur et demande les coins à la fin |
+| `game.js` | Reçoit l’état du serveur en Socket.IO et l’affiche. Il ne décide pas des règles |
+
+### Le reste
+
+| Fichier | Rôle |
+|---|---|
+| `static/css/style.css` | Toute l’apparence : noir et blanc, seules les couleurs des skins sont en couleur |
+| `schema.sql` | `CREATE TABLE` des trois tables, exécuté au premier lancement |
+| `requirements.txt` | Flask, Flask-SocketIO, Werkzeug |
+| `tests/test_game_engine.py` | Vérifie les règles sans lancer le site |
+| `tests/test_classement.py` | Vérifie les requêtes de classement et les deux pages, sur une base temporaire |
+| `docs/schema.md` | Schéma dessiné et requêtes SQL expliquées |
+| `docs/presentation.md` | Dossier pour l’oral : exigences, planning, historique |
+| `docs/bonus.md` | Règle de chaque bonus |
+| `docs/ameliorations.md` | Ce qui pourrait être ajouté plus tard |

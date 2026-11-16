@@ -18,7 +18,7 @@ multijoueur à **2 ou 3 joueurs** (mélange de *Snake* et de *Slither.io*).
 | Validation des formulaires dans le navigateur **et** sur le serveur | `validation.js` + `valider_*()` dans `app.py` | sécurité client + serveur |
 | Menu de navigation sur toutes les pages | `templates/base.html` | menu |
 | Boutique de skins (achat / équipement) | `/boutique` | mise à jour BDD |
-| Classement : podium, tri (victoires, % victoires, meilleur score, coins), stats par joueur | `/classement?tri=…` | affichage collectif, SQL |
+| Classement de groupe (parties) et classement individuel (chaque compte) | `/classement` et `/classement/individuel` | affichage collectif, SQL |
 | Solo dans le navigateur | `/solo` | JavaScript |
 | Parties à 2 ou 3 en temps réel avec Socket.IO | `/jouer` puis `/partie/<code>` | Python serveur |
 | 6 bonus : turbo, bouclier, fantôme, aimant, ciseaux, gel | moteur `game_engine.py`, [docs/bonus.md](docs/bonus.md) | algorithmique |
@@ -92,9 +92,10 @@ Le même compte ne peut pas jouer contre lui-même dans deux onglets.
 python -m unittest discover tests
 ```
 
-31 tests vérifient les règles du moteur : vitesse, murs, corps adverse, tête
-contre tête (à 2 et à 3), départs équitables à 3, dernier survivant, match nul,
-forfait, les 6 bonus, codes de salle…
+40 tests : les règles du moteur (vitesse, murs, corps adverse, tête
+contre tête à 2 et à 3, départs équitables, dernier survivant, match nul,
+forfait, les 6 bonus, codes de salle) et les deux classements SQL
+(stats, tris, parties non terminées, routes).
 
 ## Architecture
 
@@ -107,16 +108,64 @@ navigateur (HTML/CSS/JS) ──HTTP──▶ Flask (app.py) ──SQL──▶ S
 ```
 serpentix/
 ├── app.py              # serveur Flask : routes, validation, sessions, Socket.IO
-├── database.py         # TOUTES les requêtes SQL (CRUD, coins, parties, classement)
+├── database.py         # TOUTES les requêtes SQL (CRUD, coins, parties, 2 classements)
 ├── game_engine.py      # règles du jeu à 2 ou 3 (sans Flask ni SQL)
 ├── schema.sql          # création des tables
 ├── requirements.txt    # dépendances Python
-├── tests/              # tests unittest du moteur
+├── tests/              # tests unittest (moteur + classements)
 ├── templates/          # pages HTML (Jinja)
 ├── static/css/         # style.css
 ├── static/js/          # validation, lobby, solo, partie, dessin, contrôles, fin, arène
 └── docs/               # présentation, schéma BDD, architecture, bonus, améliorations
 ```
+
+## Qui fait quoi dans le code
+
+Chaque fichier a un rôle précis. Le détail (routes, flux, requêtes) est dans
+[docs/architecture.md](docs/architecture.md), section du même nom.
+
+| Fichier | Rôle |
+|---|---|
+| `app.py` | Serveur Flask : pages, validation, sessions, CSRF, Socket.IO, boucle de jeu |
+| `database.py` | Toutes les requêtes SQL : comptes, coins, parties, classement de groupe et classement individuel |
+| `game_engine.py` | Règles du jeu (déplacement, collisions, 6 bonus), sans Flask ni SQL |
+| `schema.sql` | Création des tables SQLite (`utilisateurs`, `parties`, `participations`) |
+| `requirements.txt` | Bibliothèques Python à installer |
+| `tests/test_game_engine.py` | Tests unittest des règles du moteur |
+| `tests/test_classement.py` | Tests unittest des deux classements et de leurs routes |
+| `templates/base.html` | Gabarit commun : menu, pied de page, jeton CSRF |
+| `templates/accueil.html` | Page d’accueil |
+| `templates/connexion.html` | Formulaire de connexion |
+| `templates/inscription.html` | Formulaire d’inscription |
+| `templates/lobby.html` | Page Jouer : solo, créer une salle, rejoindre |
+| `templates/partie.html` | Salle multijoueur (canvas) |
+| `templates/solo.html` | Mode solo |
+| `templates/classement.html` | Classement de groupe et classement individuel (bouton pour basculer) |
+| `templates/boutique.html` | Achat et équipement des skins |
+| `templates/profil.html` | E-mail, mot de passe, historique |
+| `templates/utilisateurs_liste.html` | Liste de tous les joueurs |
+| `templates/utilisateur_detail.html` | Fiche d’un joueur |
+| `templates/utilisateur_modifier.html` | Modifier un joueur |
+| `templates/utilisateur_nouveau.html` | Créer un joueur |
+| `templates/_historique.html` | Tableau des dernières parties (inclus) |
+| `templates/_legende.html` | Liste des bonus (incluse) |
+| `templates/_dpad.html` | Flèches tactiles (incluses) |
+| `templates/_fin.html` | Écran de fin de partie (inclus) |
+| `static/css/style.css` | Tout le style, noir et blanc |
+| `static/js/main.js` | Menu sur mobile |
+| `static/js/bg-snake.js` | Arène animée derrière l’accueil et Jouer |
+| `static/js/validation.js` | Validation des formulaires dans le navigateur |
+| `static/js/lobby.js` | Créer ou rejoindre une salle |
+| `static/js/dessin.js` | Dessin du plateau (partagé solo / multijoueur) |
+| `static/js/controles.js` | Clavier, glisser, flèches, page bloquée pendant le jeu |
+| `static/js/fin.js` | Écrans de fin animés |
+| `static/js/solo.js` | Boucle du mode solo et demande de coins |
+| `static/js/game.js` | Client temps réel d’une partie à 2 ou 3 |
+| `docs/architecture.md` | Flux, routes, fichier par fichier |
+| `docs/schema.md` | Schéma et requêtes SQL commentées |
+| `docs/presentation.md` | Dossier NSI : cahier des charges, historique des versions |
+| `docs/bonus.md` | Les 6 bonus |
+| `docs/ameliorations.md` | Idées pour la suite |
 
 Détails : [docs/architecture.md](docs/architecture.md) ·
 [docs/schema.md](docs/schema.md) ·
@@ -126,8 +175,9 @@ Détails : [docs/architecture.md](docs/architecture.md) ·
 
 ## Sécurité (résumé)
 
-- Requêtes SQL **paramétrées** (`?`) : pas d’injection SQL. Le tri du
-  classement est choisi dans une liste blanche, jamais collé depuis l’URL.
+- Requêtes SQL **paramétrées** (`?`) : pas d’injection SQL. Le tri de
+  chaque classement est choisi dans une liste blanche (`TRIS_CLASSEMENT`
+  ou `TRIS_CLASSEMENT_INDIVIDUEL`), jamais collé depuis l’URL.
 - Mots de passe **hachés** (Werkzeug), jamais stockés en clair.
 - Jeton **CSRF** sur tous les formulaires et appels `fetch` en POST.
 - Échappement automatique Jinja + `textContent` en JS : pas d’injection HTML (XSS).

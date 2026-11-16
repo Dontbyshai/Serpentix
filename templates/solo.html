@@ -4,6 +4,7 @@
 {# page-jeu : la page tient dans l'écran et ne défile pas (voir style.css) #}
 {% block body_class %}page-jeu{% endblock %}
 {% block content %}
+<!-- Mode solo. La partie est calculée dans solo.js ; le serveur ne crédite les coins qu'à la fin. -->
 <div class="game-header">
   <h1>Mode solo</h1>
   <p class="hud-stat">Score <strong id="solo-score">0</strong> · coins <span id="solo-gain">0</span></p>

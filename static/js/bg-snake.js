@@ -74,7 +74,10 @@
     for (let i = 0; i < nbPommes; i++) ajouterPomme();
   }
 
-  /** Fait (re)naître un serpent sur un bord, tourné vers l'intérieur. */
+  /**
+   * Fait (re)naître un serpent sur un bord, tourné vers l'intérieur.
+   * @param {Object} s - serpent à réinitialiser (corps, dir, grandir, mortA)
+   */
   function naitre(s) {
     const bord = Math.floor(Math.random() * 4);
     let x, y, d;
@@ -88,10 +91,19 @@
     s.mortA = 0;
   }
 
-  /** @returns {number} entier au hasard entre 0 et n-1 */
+  /**
+   * Entier au hasard.
+   * @param {number} n - borne exclue
+   * @returns {number} entier entre 0 et n-1
+   */
   function rnd(n) { return Math.floor(Math.random() * n); }
 
-  /** Case suivante avec « bords qui bouclent » (sortir à droite = rentrer à gauche). */
+  /**
+   * Case suivante avec « bords qui bouclent » (sortir à droite = rentrer à gauche).
+   * @param {number[]} c - case [x, y]
+   * @param {number[]} d - direction [dx, dy]
+   * @returns {number[]} nouvelle case
+   */
   function suivante(c, d) {
     return [(c[0] + d[0] + cols) % cols, (c[1] + d[1] + rows) % rows];
   }
@@ -105,6 +117,7 @@
     return o;
   }
 
+  /** Ajoute une pomme au hasard. Paramètre : aucun. Retour : rien. */
   function ajouterPomme() {
     pommes.push([rnd(cols), rnd(rows)]);
   }
@@ -259,9 +272,11 @@
     dessiner(maintenant);
   }
 
+  /** Démarre la boucle d'animation si elle est arrêtée. Paramètre : aucun. Retour : rien. */
   function demarrer() {
     if (animation === null) animation = requestAnimationFrame(boucle);
   }
+  /** Arrête la boucle (onglet caché) : le processeur n'est plus utilisé. Retour : rien. */
   function arreter() {
     if (animation !== null) cancelAnimationFrame(animation);
     animation = null;

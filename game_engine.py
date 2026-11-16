@@ -143,7 +143,12 @@ def tirer_type_bonus(types=None):
 
 
 class Serpent:
-    """Un serpent contrôlé par un joueur (état en mémoire uniquement)."""
+    """
+    Un serpent contrôlé par un joueur.
+
+    Il vit seulement en mémoire (pas dans SQLite) : sa position change
+    plusieurs fois par seconde. La tête est toujours corps[0].
+    """
 
     def __init__(self, joueur_id, pseudo, couleur, depart, direction):
         """
@@ -223,17 +228,34 @@ class Serpent:
         return nouvelle_tete
 
     def annuler_pas(self):
-        """Remet le serpent à sa position d'avant le dernier pas (bouclier)."""
+        """
+        Annule le dernier pas (utilisé quand le bouclier absorbe un choc).
+
+        Paramètres : aucun.
+        Retour     : None. Le corps et le compteur « grandir » redeviennent
+                     ceux d'avant avancer(). La file de virages est vidée,
+                     sinon le serpent referait tout de suite le même geste.
+        """
         if self.sauvegarde:
             self.corps, self.grandir = list(self.sauvegarde[0]), self.sauvegarde[1]
         self.file_directions = []
 
     def a_effet(self, nom):
-        """Retour : bool — True si l'effet minuté « nom » est actif."""
+        """
+        Dit si un effet minuté est encore actif.
+
+        Paramètre : nom (str) — "turbo", "fantome", "aimant" ou "gel".
+        Retour    : bool — True tant qu'il reste des ticks (> 0).
+        """
         return self.effets.get(nom, 0) > 0
 
     def en_turbo(self):
-        """Retour : bool — True si le turbo est actif."""
+        """
+        Raccourci pour savoir si le turbo est actif.
+
+        Paramètres : aucun.
+        Retour     : bool — True si l'effet « turbo » a encore des ticks.
+        """
         return self.a_effet("turbo")
 
     def to_dict(self):
@@ -360,11 +382,23 @@ class PartieEnCours:
         return False
 
     def peut_demarrer(self):
-        """Retour : bool — True si la salle est pleine et que la partie attend."""
+        """
+        Indique si la salle peut démarrer.
+
+        Paramètres : aucun.
+        Retour     : bool — True seulement si on a exactement max_joueurs
+                     joueurs ET que le statut est encore « attente ».
+        """
         return len(self.ordre_sids) == self.max_joueurs and self.statut == "attente"
 
     def demarrer(self):
-        """Lance la partie : places de départ, compte à rebours, pommes et bonus."""
+        """
+        Lance la partie.
+
+        Paramètres : aucun.
+        Retour     : None. Passe le statut à « en_cours », arme le compte à
+                     rebours, place les serpents, les pommes et les bonus.
+        """
         self.statut = "en_cours"
         self.decompte = DECOMPTE_TICKS
         self._placer_serpents()
@@ -386,7 +420,12 @@ class PartieEnCours:
     # --- Placement des objets ---------------------------------------------
 
     def _cases_occupees(self):
-        """Retour : set de toutes les cases prises (serpents, pommes, bonus)."""
+        """
+        Liste les cases déjà prises, pour ne pas poser deux objets au même endroit.
+
+        Paramètres : aucun.
+        Retour     : set de tuples (x, y) — corps des serpents, pommes, bonus.
+        """
         occ = set()
         for s in self.joueurs.values():
             occ.update(s.corps)
@@ -395,14 +434,24 @@ class PartieEnCours:
         return occ
 
     def _case_libre(self):
-        """Retour : une case (x, y) libre tirée au hasard, ou None si tout est plein."""
+        """
+        Choisit une case vide au hasard.
+
+        Paramètres : aucun.
+        Retour     : tuple (x, y), ou None si le plateau est entièrement plein.
+        """
         occ = self._cases_occupees()
         libres = [(x, y) for x in range(LARGEUR) for y in range(HAUTEUR)
                   if (x, y) not in occ]
         return random.choice(libres) if libres else None
 
     def _placer_pommes(self):
-        """Complète le plateau jusqu'à NB_POMMES pommes."""
+        """
+        Complète le plateau jusqu'à NB_POMMES pommes.
+
+        Paramètres : aucun.
+        Retour     : None. S'arrête plus tôt s'il n'y a plus de case libre.
+        """
         while len(self.pommes) < NB_POMMES:
             c = self._case_libre()
             if c is None:
@@ -410,7 +459,13 @@ class PartieEnCours:
             self.pommes.append(c)
 
     def _placer_bonus(self):
-        """Complète le plateau jusqu'à NB_BONUS bonus (type tiré au hasard, pondéré)."""
+        """
+        Complète le plateau jusqu'à NB_BONUS bonus.
+
+        Paramètres : aucun.
+        Retour     : None. Le type de chaque bonus est tiré au hasard
+                     (tirer_type_bonus, avec les poids de BONUS).
+        """
         while len(self.bonus) < NB_BONUS:
             c = self._case_libre()
             if c is None:
@@ -418,25 +473,45 @@ class PartieEnCours:
             self.bonus.append({"pos": c, "type": tirer_type_bonus()})
 
     def traiter_direction(self, sid, dx, dy):
-        """Transmet un virage au serpent du joueur sid (s'il est vivant)."""
+        """
+        Transmet un virage au serpent du joueur (s'il est vivant et que
+        le compte à rebours est fini).
+
+        Paramètres : sid (str), dx (int), dy (int) — vecteur demandé.
+        Retour     : None. Un vecteur interdit est ignoré par changer_direction.
+        """
         if sid in self.joueurs and self.joueurs[sid].vivant and self.decompte == 0:
             self.joueurs[sid].changer_direction(dx, dy)
 
     # --- Outils pour les règles ---------------------------------------------
 
     def _hors_plateau(self, case):
-        """Retour : bool — True si la case est en dehors de la grille (mur)."""
+        """
+        Dit si une case est un mur (en dehors de la grille).
+
+        Paramètre : case (tuple x, y).
+        Retour    : bool — True si x ou y sort de [0, LARGEUR[ × [0, HAUTEUR[.
+        """
         x, y = case
         return x < 0 or y < 0 or x >= LARGEUR or y >= HAUTEUR
 
     def _vivants(self):
-        """Retour : liste des sid des serpents encore en vie (ordre d'arrivée)."""
+        """
+        Liste les serpents encore en vie.
+
+        Paramètres : aucun.
+        Retour     : liste de sid, dans l'ordre d'arrivée dans la salle.
+        """
         return [sid for sid in self.ordre_sids if self.joueurs[sid].vivant]
 
     def _pivoter(self, serpent):
         """
         Après un choc absorbé par le bouclier, tourne le serpent vers une case
         libre (à gauche ou à droite). Sinon il repartirait dans le même mur.
+
+        Paramètre : serpent (Serpent) — celui qui vient d'être sauvé.
+        Retour    : None. La direction est modifiée seulement si une case
+                    perpendiculaire est libre ; sinon elle ne change pas.
         """
         dx, dy = serpent.direction
         occupees = set()
@@ -454,6 +529,9 @@ class PartieEnCours:
         """
         Règle « Slither » : un serpent éliminé laisse des pommes là où était
         son corps (une case sur deux, au plus POMMES_LACHEES_MAX).
+
+        Paramètre : serpent (Serpent) éliminé.
+        Retour    : None. Les pommes sont ajoutées à self.pommes.
         """
         lachees = 0
         for case in serpent.corps[1::2]:
@@ -465,8 +543,11 @@ class PartieEnCours:
 
     def _ennemi_le_plus_proche(self, sid):
         """
-        Retour : sid du serpent ennemi vivant dont la tête est la plus proche
-        (distance de Manhattan |dx| + |dy|), ou None.
+        Cherche l'adversaire vivant le plus proche (pour le bonus ciseaux).
+
+        Paramètre : sid (str) — le serpent qui vient de prendre les ciseaux.
+        Retour    : sid de l'ennemi dont la tête est la plus proche
+                    (distance de Manhattan |dx| + |dy|), ou None s'il est seul.
         """
         tete = self.joueurs[sid].corps[0]
         meilleur, distance_min = None, None
@@ -482,7 +563,10 @@ class PartieEnCours:
     def _activer_bonus(self, sid, type_bonus):
         """
         Applique l'effet d'un bonus ramassé par le serpent sid.
-        Paramètres : sid (str), type_bonus (clé de BONUS).
+
+        Paramètres : sid (str), type_bonus (str, clé de BONUS).
+        Retour     : None. Selon le type : bouclier armé, queue coupée,
+                     adversaires gelés, ou minuteur d'effet démarré.
         """
         s = self.joueurs[sid]
         if type_bonus == "bouclier":
@@ -516,6 +600,9 @@ class PartieEnCours:
         Effet « aimant » : chaque pomme à moins de RAYON_AIMANT cases de la tête
         d'un serpent aimanté se rapproche d'une case vers cette tête (sur l'axe
         où l'écart est le plus grand), si la case visée est libre.
+
+        Paramètres : aucun.
+        Retour     : None. self.pommes est modifié sur place.
         """
         corps = set()
         for s in self.joueurs.values():
@@ -703,15 +790,23 @@ class PartieEnCours:
         }
 
     def scores_par_id(self):
-        """Retour : dict {utilisateur_id: score} pour la sauvegarde en BDD."""
+        """
+        Prépare les scores à écrire dans la table participations.
+
+        Paramètres : aucun.
+        Retour     : dict {utilisateur_id: score}.
+        """
         return {s.joueur_id: s.score for s in self.joueurs.values()}
 
 
 def reglages_client():
     """
-    Retour : dict des réglages utiles au mode solo (solo.js).
-    Le template solo.html les injecte dans la page : le solo utilise donc
-    EXACTEMENT les mêmes valeurs que le serveur (une seule source de vérité).
+    Donne au mode solo les mêmes réglages que le serveur.
+
+    Paramètres : aucun.
+    Retour     : dict (vitesse, taille du plateau, bonus du solo…).
+    Le template solo.html l'injecte dans la page : solo.js n'a pas une
+    deuxième copie des constantes (une seule source de vérité).
     """
     return {
         "ticks_par_seconde": TICKS_PAR_SECONDE,
