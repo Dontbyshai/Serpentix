@@ -189,6 +189,13 @@ def login_requis(f):
     """
     @wraps(f)
     def decorated(*args, **kwargs):
+        """
+        Fonction réellement appelée à la place de la route.
+
+        Paramètres : *args, **kwargs — ceux de l'URL (par exemple l'id).
+        Retour     : redirection vers /connexion si personne n'est connecté,
+                     sinon le retour de la route d'origine (page HTML, JSON…).
+        """
         if not utilisateur_connecte():
             flash("Connecte-toi pour accéder à cette page.", "warning")
             return redirect(url_for("connexion", next=request.path))
@@ -481,26 +488,77 @@ def boutique():
                            equipe=db.skin_id_depuis_hex(user["couleur_skin"]))
 
 
-@app.route("/classement")
-def classement():
+def _afficher_classement(vue):
     """
-    READ collectif : classement calculé en SQL (voir database.classement).
-    Paramètre d'URL ?tri=victoires|ratio|score|coins. Une valeur inconnue
-    (ou piégée) est remplacée par « victoires » : validation côté serveur.
+    Prépare une des deux pages de classement et renvoie le HTML.
+
+    Paramètre : vue (str) — "groupe" (résultat des parties) ou "individuel"
+                (stats de chaque compte). Toute autre valeur est ramenée à
+                "groupe", pour ne jamais appeler la mauvaise requête.
+    Retour    : réponse Flask (template classement.html).
+
+    Le tri vient de l'URL (?tri=). On ne l'accepte que s'il appartient à la
+    liste blanche DU classement demandé. Une valeur inconnue, ou une tentative
+    d'injection SQL, est remplacée par « victoires ». La phrase ORDER BY
+    n'est pas construite ici : database.py en choisit une déjà écrite.
     """
+    if vue == "individuel":
+        tris = db.TRIS_CLASSEMENT_INDIVIDUEL
+        lire = db.classement_individuel
+    else:
+        vue = "groupe"
+        tris = db.TRIS_CLASSEMENT
+        lire = db.classement
+
     tri = request.args.get("tri", "victoires")
-    if tri not in db.TRIS_CLASSEMENT:
-        tri = "victoires"
-    lignes = db.classement(tri=tri, limit=50)
+    if tri not in tris:
+        tri = "victoires"  # valeur par défaut sûre
+
+    lignes = lire(tri=tri, limit=50)
     moi = utilisateur_connecte()
-    # Position du joueur connecté (pour la mettre en évidence)
+    # Rang du joueur connecté : sert à surligner sa ligne et à afficher « Ta place ».
     ma_ligne = None
     if moi:
         for rang, ligne in enumerate(lignes, start=1):
             if ligne["id"] == moi["id"]:
                 ma_ligne = {**ligne, "rang": rang}
-    return render_template("classement.html", classement=lignes, tri=tri,
-                           podium=lignes[:3], ma_ligne=ma_ligne)
+                break
+    return render_template(
+        "classement.html",
+        classement=lignes,
+        tri=tri,
+        vue=vue,
+        podium=lignes[:3],
+        ma_ligne=ma_ligne,
+    )
+
+
+@app.route("/classement")
+def classement():
+    """
+    Classement DE GROUPE (la page qui existait déjà).
+
+    URL    : /classement?tri=victoires|ratio|score|coins
+    Retour : page HTML (podium + tableau).
+    Le calcul SQL est database.classement : on classe selon le vainqueur
+    de chaque partie multijoueur terminée. Le comportement de cette route
+    (tri, limite de 50, mise en avant du joueur connecté) ne change pas.
+    """
+    return _afficher_classement("groupe")
+
+
+@app.route("/classement/individuel")
+def classement_individuel():
+    """
+    Classement INDIVIDUEL : une ligne par compte joueur.
+
+    URL    : /classement/individuel?tri=victoires|nuls|defaites|ratio|score|coins|parties
+    Retour : la même page HTML, onglet « individuel » actif.
+    Le calcul SQL est database.classement_individuel (stats lues sur la
+    participation de chaque joueur : parties, victoires, nuls, défaites,
+    pourcentage, meilleur score, coins du compte).
+    """
+    return _afficher_classement("individuel")
 
 
 @app.route("/jouer")

@@ -2,6 +2,7 @@
 {% extends "base.html" %}
 {% block title %}Modifier {{ user.pseudo }} · Serpentix{% endblock %}
 {% block content %}
+<!-- Formulaire de mise à jour (UPDATE) : pseudo, e-mail, mot de passe. Réservé au propriétaire du compte. -->
 <h1>Modifier {{ user.pseudo }}</h1>
 <p class="muted">Formulaire de mise à jour. Les skins se gèrent dans la boutique.</p>
 <form class="form" method="post" id="form-modifier" novalidate>

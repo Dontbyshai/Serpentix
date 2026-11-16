@@ -26,7 +26,11 @@ function clearErrs(form) {
   form.querySelectorAll(".err").forEach(function (e) { e.textContent = ""; });
 }
 
-/** @param {string} value @returns {string|null} */
+/**
+ * Contrôle un pseudo (3 à 20 caractères, lettres, chiffres, _ et -).
+ * @param {string} value - texte saisi
+ * @returns {string|null} message d'erreur, ou null si c'est bon
+ */
 function checkPseudo(value) {
   const v = (value || "").trim();
   if (v.length < 3) return "Le pseudo doit faire au moins 3 caractères.";
@@ -36,7 +40,11 @@ function checkPseudo(value) {
   return null;
 }
 
-/** @param {string} value @returns {string|null} */
+/**
+ * Contrôle une adresse e-mail (présente, pas trop longue, forme nom@domaine.xx).
+ * @param {string} value - texte saisi
+ * @returns {string|null} message d'erreur, ou null si c'est bon
+ */
 function checkEmail(value) {
   const v = (value || "").trim();
   if (!v) return "L'e-mail est obligatoire.";
@@ -46,9 +54,10 @@ function checkEmail(value) {
 }
 
 /**
- * @param {string} value
+ * Contrôle un mot de passe (6 à 100 caractères).
+ * @param {string} value - texte saisi
  * @param {boolean} obligatoire - faux = champ vide accepté (« inchangé »)
- * @returns {string|null}
+ * @returns {string|null} message d'erreur, ou null si c'est bon
  */
 function checkMdp(value, obligatoire) {
   if (!value) return obligatoire ? "Le mot de passe est obligatoire." : null;
@@ -74,7 +83,10 @@ function brancherValidation(id, regles) {
 }
 
 /**
- * Vérifie un champ et affiche son erreur.
+ * Affiche l'erreur d'un champ, ou l'efface s'il n'y en a pas.
+ * @param {HTMLFormElement} form
+ * @param {string} name - nom du champ
+ * @param {string|null} erreur - message, ou null
  * @returns {boolean} true si le champ est valide
  */
 function verifier(form, name, erreur) {

@@ -772,7 +772,9 @@ html.jeu-verrouille { overflow: hidden; overscroll-behavior: none; }
 .choix-joueurs input:focus-visible + span { outline: 2px solid #ffffff; outline-offset: 3px; }
 
 /* ----- Classement : onglets de tri, podium, ligne du joueur ----- */
+/* .tabs-vue = le choix « groupe / individuel », juste au-dessus des tris. */
 .tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
+.tabs.tabs-vue { margin-bottom: 0.75rem; }
 .tab {
   border: 1px solid #ffffff; border-radius: 999px; padding: 0.4rem 0.95rem;
   font-size: 0.85rem; font-weight: 600; text-decoration: none !important;

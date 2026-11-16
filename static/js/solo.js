@@ -89,6 +89,7 @@
     return libres.length ? libres[Math.floor(Math.random() * libres.length)] : null;
   }
 
+  /** Complète le plateau jusqu'au nombre de pommes prévu (R.nb_pommes). Retour : rien. */
   function placerPommes() {
     while (pommes.length < R.nb_pommes) {
       const c = caseLibre();
@@ -109,6 +110,7 @@
     return TYPES_BONUS[0];
   }
 
+  /** Complète le plateau jusqu'au nombre de bonus prévu (R.nb_bonus). Retour : rien. */
   function placerBonus() {
     while (bonus.length < R.nb_bonus) {
       const c = caseLibre();
@@ -117,6 +119,10 @@
     }
   }
 
+  /**
+   * Met à jour le score et les coins affichés (plafond COINS_MAX, comme le serveur).
+   * Paramètres : aucun. Retour : rien.
+   */
   function afficherScore() {
     scoreEl.textContent = String(score);
     gainEl.textContent = String(Math.min(score, COINS_MAX));

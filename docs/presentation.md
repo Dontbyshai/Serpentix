@@ -28,9 +28,11 @@ Slither.io, avec un vrai site autour :
 3. **mode solo** pour s’entraîner et gagner des **coins** ;
 4. **boutique** : les coins débloquent des couleurs de serpent (rouge, vert,
    orange, jaune) ; tout le reste du site est en noir et blanc ;
-5. **classement** calculé en SQL à partir des parties enregistrées : podium,
-   tri par victoires, % de victoires, meilleur score ou coins, statistiques
-   par joueur (parties, victoires, nuls, défaites).
+5. **deux classements** calculés en SQL : le classement **de groupe** (qui a
+   gagné chaque partie, tri par victoires, % de victoires, meilleur score ou
+   coins) et le classement **individuel** (une ligne par compte : parties
+   jouées, victoires, nuls, défaites, % de victoires, meilleur score, coins).
+   Un bouton bascule de l’un à l’autre.
 
 Le serveur web est écrit en **Python avec Flask**, le temps réel utilise
 **Flask-SocketIO** (WebSocket), la base est **SQLite** (langage SQL) et
@@ -45,7 +47,7 @@ l’interface est en **HTML, CSS et JavaScript** (canvas).
 | Formulaire qui ajoute des données en base | `/inscription` et `/utilisateurs/nouveau` → `INSERT INTO utilisateurs` |
 | Formulaires sécurisés côté client | `validation.js` + attributs HTML (`minlength`, `pattern`, `required`) |
 | Sécurité côté serveur | fonctions `valider_*` en Python, unicité, droits « seulement son compte », jeton CSRF, requêtes paramétrées |
-| Affichage individuel et collectif | `/utilisateurs/<id>` (fiche) et `/utilisateurs` (tableau), `/classement` |
+| Affichage individuel et collectif | `/utilisateurs/<id>` (fiche) et `/utilisateurs` (tableau), `/classement` (groupe) et `/classement/individuel` (chaque compte) |
 | Bouton supprimer | « Supprimer » (POST + confirmation) → `DELETE FROM utilisateurs` |
 | Bouton mettre à jour | « Modifier » et `/profil` → `UPDATE utilisateurs` |
 | Menu de navigation | en-tête de `base.html`, présent sur toutes les pages (menu ☰ sur mobile) |
@@ -61,7 +63,7 @@ Pages du site :
 | Partie | Plateau temps réel à 2 ou 3, scores, effets actifs, compte à rebours, écran de fin animé |
 | Solo | Plateau solo, pause, effets actifs, écran de fin |
 | Boutique | Achat et équipement des skins |
-| Classement | Podium, tri, victoires / nuls / défaites, % de victoires, meilleur score, coins |
+| Classement | Deux vues : groupe (résultat des parties) et individuel (stats de chaque compte), podium, tris |
 | Profil | E-mail, mot de passe, historique |
 | Gestion joueurs | CRUD complet (lien en pied de page) |
 
@@ -132,6 +134,7 @@ est décrit dans **[architecture.md](architecture.md)**.
 | v4 | Interface strictement noir et blanc, serpent animé en fond |
 | v5 | Audit complet : corrections de bugs, sécurité (CSRF, anti-triche), contrôles mobiles, compte à rebours, tests, commentaires et documentation |
 | v6 | Jeu ralenti (7 pas/s), parties à 3, 4 nouveaux bonus, écrans de fin animés, classement avec podium et tri, arène animée sur l’accueil, page bloquée pendant le jeu, comptes Shai / noah |
+| v7 | Classement individuel (requête SQL, route `/classement/individuel`, onglet pour basculer), commentaires dans le code, section « Qui fait quoi dans le code » |
 
 ---
 
@@ -162,7 +165,8 @@ est décrit dans **[architecture.md](architecture.md)**.
 | Un joueur qui quittait la salle d’attente puis un nouvel arrivant pouvaient avoir la même case de départ | Les places sont données au démarrage, d’après l’ordre final des joueurs |
 | Départs à 3 : risque qu’un joueur soit avantagé | Trois colonnes parallèles, même distance au mur pour chacun (vérifié par un test) |
 | Les mots de passe `1234` demandés pour 3 comptes sont plus courts que la règle du formulaire (6 caractères) | Les comptes sont créés directement par le serveur (`python app.py --comptes`) ; la règle reste pour les inscriptions |
-| Le tri du classement vient de l’URL : risque d’injection SQL | Liste blanche `TRIS_CLASSEMENT` : on choisit une clause `ORDER BY` connue, jamais le texte reçu |
+| Le tri du classement vient de l’URL : risque d’injection SQL | Listes blanches `TRIS_CLASSEMENT` et `TRIS_CLASSEMENT_INDIVIDUEL` : on choisit une clause `ORDER BY` connue, jamais le texte reçu |
+| Le classement ne montrait que le vainqueur de la partie, pas les stats lues sur le compte | Deux requêtes : `classement` (`parties.vainqueur_id`) et `classement_individuel` (`participations.a_gagne`, score, coins) |
 | Ancienne base sans la colonne `nb_joueurs` | `migrer_si_besoin()` fait `ALTER TABLE parties ADD COLUMN` sans perdre de données |
 | La page défilait avec la molette ou les flèches pendant la partie | Page en `100vh` sans débordement + `preventDefault()` sur molette, doigt et touches (`passive: false`) |
 | Le serpent décoratif de l’accueil ressemblait à quelques carrés perdus | Arène plein écran avec plusieurs serpents automatiques (pommes, collisions, réapparition), textes sur panneaux noirs pleins |

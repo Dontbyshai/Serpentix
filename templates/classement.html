@@ -1,30 +1,74 @@
-{# classement.html — Podium + tableau triable, calculés en SQL (database.classement). #}
+{# classement.html — Podium + tableau triable.
+   Deux vues, deux requêtes SQL :
+   - vue « groupe » : database.classement (vainqueur de chaque partie) ;
+   - vue « individuel » : database.classement_individuel (stats de chaque compte).
+   Le tri (?tri=) est choisi dans une liste blanche côté serveur. #}
 {% extends "base.html" %}
-{% block title %}Classement · Serpentix{% endblock %}
+{% block title %}{% if vue == 'individuel' %}Classement individuel{% else %}Classement{% endif %} · Serpentix{% endblock %}
 {% block content %}
+<!-- Page de classement. La variable « vue » (groupe ou individuel) vient de la route Flask. -->
 <div class="page-head">
   <div>
-    <h1>Classement</h1>
-    <p>Parties multijoueur terminées (2 ou 3 joueurs), calculées par une requête SQL sur la base.</p>
+    {% if vue == 'individuel' %}
+      <h1>Classement individuel</h1>
+      <p>Chaque compte joueur, avec ses statistiques personnelles, calculées en SQL.</p>
+    {% else %}
+      <h1>Classement de groupe</h1>
+      <p>Parties multijoueur terminées (2 ou 3 joueurs), calculées par une requête SQL sur la base.</p>
+    {% endif %}
   </div>
   {% if ma_ligne %}
+    <!-- Pastille : place du joueur connecté dans le tri affiché -->
     <div class="coins-pill">Ta place <strong>#{{ ma_ligne.rang }}</strong></div>
   {% endif %}
 </div>
 
-{# Onglets de tri : de simples liens ?tri=… (le serveur vérifie la valeur) #}
-{% set onglets = [("victoires", "Victoires"), ("ratio", "% victoires"), ("score", "Meilleur score"), ("coins", "Coins")] %}
+<!-- Bascule entre les deux classements. Le tri actuel est renvoyé dans l'URL :
+     s'il n'existe pas dans l'autre vue, le serveur le remplace par « victoires ». -->
+<nav class="tabs tabs-vue" aria-label="Type de classement">
+  <a href="{{ url_for('classement', tri=tri) }}"
+     class="tab {% if vue != 'individuel' %}actif{% endif %}"
+     {% if vue != 'individuel' %}aria-current="page"{% endif %}>Classement de groupe</a>
+  <a href="{{ url_for('classement_individuel', tri=tri) }}"
+     class="tab {% if vue == 'individuel' %}actif{% endif %}"
+     {% if vue == 'individuel' %}aria-current="page"{% endif %}>Classement individuel</a>
+</nav>
+
+{# Onglets de tri. Le classement de groupe garde ses 4 tris d'origine.
+   Le classement individuel ajoute nuls, défaites et parties jouées. #}
+{% if vue == 'individuel' %}
+  {% set onglets = [
+    ("victoires", "Victoires"),
+    ("nuls", "Nuls"),
+    ("defaites", "Défaites"),
+    ("ratio", "% victoires"),
+    ("score", "Meilleur score"),
+    ("coins", "Coins"),
+    ("parties", "Parties"),
+  ] %}
+  {% set endpoint = 'classement_individuel' %}
+{% else %}
+  {% set onglets = [("victoires", "Victoires"), ("ratio", "% victoires"), ("score", "Meilleur score"), ("coins", "Coins")] %}
+  {% set endpoint = 'classement' %}
+{% endif %}
 <nav class="tabs" aria-label="Trier le classement">
   {% for cle, nom in onglets %}
-    <a href="{{ url_for('classement', tri=cle) }}" class="tab {% if tri == cle %}actif{% endif %}"
+    <a href="{{ url_for(endpoint, tri=cle) }}" class="tab {% if tri == cle %}actif{% endif %}"
        {% if tri == cle %}aria-current="page"{% endif %}>{{ nom }}</a>
   {% endfor %}
 </nav>
 
 {% if classement %}
-{# Valeur mise en avant selon le tri choisi #}
+{# Valeur mise en avant sur le podium, selon le tri choisi.
+   Pour le classement de groupe, seuls victoires, ratio, score et coins arrivent ici. #}
 {% macro valeur(j) -%}
-  {%- if tri == "ratio" %}{{ j.ratio }} %{% elif tri == "score" %}{{ j.meilleur_score }} pts{% elif tri == "coins" %}◈ {{ j.coins }}{% else %}{{ j.victoires }} V{% endif -%}
+  {%- if tri == "ratio" %}{{ j.ratio }} %
+  {%- elif tri == "score" %}{{ j.meilleur_score }} pts
+  {%- elif tri == "coins" %}◈ {{ j.coins }}
+  {%- elif tri == "nuls" %}{{ j.nuls }} N
+  {%- elif tri == "defaites" %}{{ j.defaites }} D
+  {%- elif tri == "parties" %}{{ j.parties_jouees }} P
+  {%- else %}{{ j.victoires }} V{% endif -%}
 {%- endmacro %}
 
 <!-- Podium : 2e à gauche, 1er au centre (plus haut), 3e à droite -->
@@ -73,7 +117,11 @@
   </tbody>
 </table>
 </div>
+{% if vue == 'individuel' %}
+<p class="hint mt">V = victoires personnelles · N = matchs nuls · D = défaites. Une victoire est lue sur la participation du joueur (<code>a_gagne</code>), le meilleur score sur ses parties terminées, les coins sur son compte.</p>
+{% else %}
 <p class="hint mt">V = victoires · N = matchs nuls · D = défaites. Seules les parties terminées comptent.</p>
+{% endif %}
 {% else %}
 <p class="muted">Personne au classement pour l’instant.</p>
 {% endif %}

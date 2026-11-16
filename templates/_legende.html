@@ -1,4 +1,5 @@
 {# _legende.html — Liste des bonus avec leur pictogramme (dessiné par dessin.js). #}
+<!-- Légende des bonus. En solo, ciseaux et gel sont masqués (ils n'ont pas d'adversaire). -->
 <ul class="legende">
   {% for cle, (nom, description) in BONUS_INFOS.items() if (not solo or cle not in ("ciseaux", "gel")) %}
     <li><span data-picto="{{ cle }}" aria-hidden="true"></span><span><strong>{{ nom }}</strong> · {{ description }}</span></li>
